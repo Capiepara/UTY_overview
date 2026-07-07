@@ -198,18 +198,38 @@ function countDistinctBy(data, colNames) {
 }
 
 function countStage(stageName, status = null) {
-  const data = filteredData.filter(row => {
-    const stage = String(getCol(row, ["DEV. Stage"])).trim().toUpperCase();
-    const activeDrop = String(getCol(row, ["Active/Drop"])).trim().toUpperCase();
 
-    if (stage !== stageName.toUpperCase()) return false;
+    const devSet = new Set();
 
-    if (status) return activeDrop.includes(status.toUpperCase());
+    filteredData.forEach(row => {
 
-    return true;
-  });
+        const stage = String(getCol(row, ["DEV. Stage"]))
+            .trim()
+            .toUpperCase();
 
-  return distinctDev(data);
+        const activeDrop = String(getCol(row, ["Active/Drop"]))
+            .trim()
+            .toUpperCase();
+
+        if (stage !== stageName.toUpperCase())
+            return;
+
+        if (status) {
+
+            if (!activeDrop.includes(status.toUpperCase()))
+                return;
+
+        }
+
+        const dev = String(getCol(row, ["DEV. Code"])).trim();
+
+        if (dev)
+            devSet.add(dev);
+
+    });
+
+    return devSet.size;
+
 }
 
 function calcWaterfall() {
@@ -388,59 +408,61 @@ function drawOntime(dataObj) {
     }
   });
 }
-
 function drawWaterfall(wf) {
-  destroyChart("waterfallChart");
 
-  let running = 0;
+    destroyChart("waterfallChart");
 
-  const floatingData = wf.values.map(value => {
-    if (value >= 0) {
-      const start = 0;
-      const end = value;
-      running = value;
-      return [start, end];
-    } else {
-      const start = running;
-      const end = running + value;
-      running = end;
-      return [end, start];
-    }
-  });
+    charts.waterfallChart = new Chart(
+        document.getElementById("waterfallChart"),
+        {
 
-  charts.waterfallChart = new Chart(document.getElementById("waterfallChart"), {
-    type: "bar",
-    data: {
-      labels: wf.labels,
-      datasets: [{
-        label: "DEV Code",
-        data: floatingData,
-        backgroundColor: wf.values.map(v => v < 0 ? "#fb923c" : "#2563eb"),
-        borderRadius: 8
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: context => {
-              const value = wf.values[context.dataIndex];
-              return value;
+            type: "bar",
+
+            data: {
+
+                labels: wf.labels,
+
+                datasets: [{
+
+                    data: wf.values,
+
+                    backgroundColor: wf.values.map(v =>
+                        v >= 0 ? "#2563eb" : "#fb923c"
+                    ),
+
+                    borderRadius: 8
+
+                }]
+
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                plugins: {
+
+                    legend: {
+                        display: false
+                    }
+
+                },
+
+                scales: {
+
+                    y: {
+                        beginAtZero: true
+                    }
+
+                }
+
             }
-          }
+
         }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 }
-        }
-      }
-    }
-  });
+    );
+
 }
 
 function renderTable() {
