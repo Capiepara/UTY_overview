@@ -213,38 +213,44 @@ function countStage(stageName, status = null) {
 }
 
 function calcWaterfall() {
-  const lr2Total = countStage("LR2");
-  const lr2Dropped = countStage("LR2", "Dropped");
 
-  const flcTotal = Math.max(lr2Total - lr2Dropped, 0);
-  const flcDropped = countStage("FLC", "Dropped");
+    // Đếm trực tiếp theo DEV Stage
+    const lr2Total = countStage("LR2");
+    const flcTotal = countStage("FLC");
+    const smsTotal = countStage("SMS");
+    const cfmTotal = countStage("CFM");
 
-  const smsTotal = Math.max(flcTotal - flcDropped, 0);
-  const smsDropped = countStage("SMS", "Dropped");
+    // Đếm số Dropped của từng Stage
+    const lr2Dropped = countStage("LR2", "DROP");
+    const flcDropped = countStage("FLC", "DROP");
+    const smsDropped = countStage("SMS", "DROP");
 
-  const cfmTotal = Math.max(smsTotal - smsDropped, 0);
+    return {
 
-  return {
-    labels: [
-      "LR2 Total",
-      "LR2 Dropped",
-      "FLC Total",
-      "FLC Dropped",
-      "SMS Total",
-      "SMS Dropped",
-      "CFM Total"
-    ],
-    values: [
-      lr2Total,
-      -lr2Dropped,
-      flcTotal,
-      -flcDropped,
-      smsTotal,
-      -smsDropped,
-      cfmTotal
-    ],
-    cfmTotal
-  };
+        labels: [
+            "LR2 Total",
+            "LR2 Dropped",
+            "FLC Total",
+            "FLC Dropped",
+            "SMS Total",
+            "SMS Dropped",
+            "CFM Total"
+        ],
+
+        values: [
+            lr2Total,
+            -lr2Dropped,
+            flcTotal,
+            -flcDropped,
+            smsTotal,
+            -smsDropped,
+            cfmTotal
+        ],
+
+        cfmTotal
+
+    };
+
 }
 
 function calcOntimeByStage() {
