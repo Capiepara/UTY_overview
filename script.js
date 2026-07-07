@@ -234,16 +234,17 @@ function countStage(stageName, status = null) {
 
 function calcWaterfall() {
 
-    // Đếm trực tiếp theo DEV Stage
     const lr2Total = countStage("LR2");
-    const flcTotal = countStage("FLC");
-    const smsTotal = countStage("SMS");
-    const cfmTotal = countStage("CFM");
-
-    // Đếm số Dropped của từng Stage
     const lr2Dropped = countStage("LR2", "DROP");
+
+    const flcTotal = countStage("FLC");
     const flcDropped = countStage("FLC", "DROP");
+
+    const smsTotal = countStage("SMS");
     const smsDropped = countStage("SMS", "DROP");
+
+    // CFM = SMS Active
+    const cfmTotal = smsTotal - smsDropped;
 
     return {
 
@@ -254,7 +255,7 @@ function calcWaterfall() {
             "FLC Dropped",
             "SMS Total",
             "SMS Dropped",
-            "CFM Total"
+            "CFM"
         ],
 
         values: [
