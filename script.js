@@ -4,7 +4,7 @@ let filteredData = [];
 let headers = [];
 
 let charts = {};
-
+Chart.register(ChartDataLabels);
 const excelFile = document.getElementById("excelFile");
 const sheetSelect = document.getElementById("sheetSelect");
 const generateBtn = document.getElementById("generateBtn");
@@ -357,9 +357,22 @@ function drawBar(canvasId, title, dataObj) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false }
-      },
+   plugins: {
+    legend: {
+        display: false
+    },
+
+    datalabels: {
+        color: "#374151",
+        anchor: "end",
+        align: "top",
+        formatter: (value) => value,
+        font: {
+            weight: "bold",
+            size: 11
+        }
+    }
+},
       scales: {
         y: {
           beginAtZero: true,
@@ -394,9 +407,22 @@ function drawOntime(dataObj) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false }
-      },
+     plugins: {
+    legend: {
+        display: false
+    },
+
+    datalabels: {
+        color: "#374151",
+        anchor: "end",
+        align: "top",
+        formatter: (value) => value + "%",
+        font: {
+            weight: "bold",
+            size: 11
+        }
+    }
+},
       scales: {
         y: {
           beginAtZero: true,
