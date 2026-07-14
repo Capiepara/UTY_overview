@@ -7,9 +7,9 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.0.0">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -20,11 +20,15 @@
   <main class="page-shell">
     <header class="page-header">
       <div>
-        <p class="eyebrow">DEVELOPMENT ANALYTICS</p>
+        <p class="eyebrow">DEVELOPMENT REPORT</p>
         <h1>UTY Development Dashboard</h1>
-        <p class="subtitle">Import the weekly Excel report and analyze the Development Tracking sheet.</p>
+        <p class="subtitle">Upload the weekly Excel report and review the Development Tracking sheet.</p>
       </div>
-      <div id="loadBadge" class="status-badge">Waiting for file</div>
+
+      <div class="header-status">
+        <div id="loadBadge" class="status-badge">Waiting for file</div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v3.0.0</strong></div>
+      </div>
     </header>
 
     <section class="panel upload-panel">
@@ -43,6 +47,7 @@
 
         <button id="generateBtn" class="primary-btn" disabled>Generate dashboard</button>
       </div>
+
       <div class="file-line">
         <span id="fileName">No file selected</span>
         <span id="fileMeta"></span>
@@ -54,7 +59,7 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">FILTERS</p>
-            <h2>Analysis scope</h2>
+            <h2>Choose what to view</h2>
           </div>
           <button id="resetBtn" class="ghost-btn">Reset all</button>
         </div>
@@ -63,31 +68,34 @@
           <div class="field"><label>Season</label><select id="seasonFilter" multiple></select></div>
           <div class="field"><label>Stage</label><select id="stageFilter" multiple></select></div>
           <div class="field"><label>Factory</label><select id="factoryFilter" multiple></select></div>
-          <div class="field"><label>Material indicator</label><select id="materialFilter" multiple></select></div>
+          <div class="field"><label>Material type</label><select id="materialFilter" multiple></select></div>
           <div class="field model-filter"><label>Model</label><select id="modelFilter" multiple></select></div>
         </div>
       </section>
 
       <section class="kpi-grid">
         <article class="kpi-card accent-cyan">
-          <span>Total DEV code</span>
+          <span>Total DEV codes</span>
           <strong id="kpiDev">0</strong>
-          <small>Distinct DEV. Code</small>
+          <small>Unique DEV. Code values</small>
         </article>
+
         <article class="kpi-card accent-orange">
-          <span>Overall milestone on-time</span>
+          <span>Overall on-time rate</span>
           <strong id="kpiHealth">0%</strong>
-          <small>Five plan-versus-actual gates</small>
+          <small>Across five main checkpoints</small>
         </article>
+
         <article class="kpi-card accent-coral">
-          <span>CFM / SMS active</span>
+          <span>CFM / active SMS</span>
           <strong id="kpiCfm">0</strong>
           <small>SMS total minus SMS dropped</small>
         </article>
+
         <article class="kpi-card accent-navy">
-          <span>Models in scope</span>
+          <span>Models shown</span>
           <strong id="kpiModels">0</strong>
-          <small>Distinct Model</small>
+          <small>Unique models after filtering</small>
         </article>
       </section>
 
@@ -95,8 +103,8 @@
         <article class="panel chart-panel">
           <div class="section-head compact">
             <div>
-              <p class="section-kicker">PIPELINE</p>
-              <h2>Stage waterfall</h2>
+              <p class="section-kicker">STAGE FLOW</p>
+              <h2>Development stage waterfall</h2>
             </div>
           </div>
           <div id="waterfallChart" class="chart chart-large"></div>
@@ -105,9 +113,10 @@
         <article class="panel chart-panel">
           <div class="section-head compact">
             <div>
-              <p class="section-kicker">MILESTONE HEALTH</p>
-              <h2>Plan versus actual</h2>
+              <p class="section-kicker">ON-TIME CHECK</p>
+              <h2>Plan compared with actual</h2>
             </div>
+
             <select id="healthStage" class="stage-selector">
               <option value="LR2">LR2</option>
               <option value="FLC">FLC</option>
@@ -115,10 +124,13 @@
               <option value="CFM">CFM</option>
             </select>
           </div>
+
           <div id="healthChart" class="chart chart-large"></div>
+
+          <div id="healthSummary" class="health-summary"></div>
+
           <p class="chart-note">
-            “No need”, “-”, “N/A”, existing, locked and arrived are treated as compliant.
-            Late dates remain completed but are scored as late.
+            “No need”, “-”, “N/A”, existing, locked and arrived are counted as on time.
           </p>
         </article>
       </section>
@@ -127,33 +139,43 @@
         <article class="panel chart-panel sankey-panel">
           <div class="section-head compact">
             <div>
-              <p class="section-kicker">MATERIAL FLOW</p>
-              <h2>Stage → material indicator</h2>
+              <p class="section-kicker">MATERIAL AND PRODUCT MIX</p>
+              <h2>Stage → material type → gender/model</h2>
             </div>
+
+            <select id="flowDetail" class="stage-selector wide-selector">
+              <option value="genderModel">Show Gender / Model</option>
+              <option value="materialOnly">Material only</option>
+            </select>
           </div>
+
           <div id="sankeyChart" class="chart chart-xl"></div>
+          <p class="chart-note">Small Gender / Model groups are combined as “Other” to keep the chart readable.</p>
         </article>
 
         <article class="panel chart-panel heatmap-panel">
           <div class="section-head compact">
             <div>
-              <p class="section-kicker">MODEL MIX</p>
-              <h2>Model distribution by stage</h2>
+              <p class="section-kicker">MODEL VIEW</p>
+              <h2>How each model is split by stage</h2>
             </div>
           </div>
+
           <div id="heatmapChart" class="chart chart-xl"></div>
-          <p class="chart-note">Each row totals 100%; cells show the share of a model’s DEV codes by stage.</p>
+          <p class="chart-note">Each row totals 100%. Darker cells mean a larger share for that model.</p>
         </article>
       </section>
 
       <section class="panel detail-panel">
         <div class="section-head compact">
           <div>
-            <p class="section-kicker">DETAIL</p>
+            <p class="section-kicker">DETAILS</p>
             <h2>Filtered DEV codes</h2>
           </div>
-          <input id="tableSearch" class="search-input" placeholder="Search DEV code, model, factory…" />
+
+          <input id="tableSearch" class="search-input" placeholder="Search DEV code, model or factory" />
         </div>
+
         <div class="table-wrap">
           <table id="detailTable"></table>
         </div>
@@ -161,6 +183,6 @@
     </section>
   </main>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=3.0.0"></script>
 </body>
 </html>

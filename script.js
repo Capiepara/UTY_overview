@@ -1,3 +1,6 @@
+const APP_VERSION = "v3.0.0";
+document.getElementById("appVersion").textContent = APP_VERSION;
+
 let workbook = null;
 let rawData = [];
 let filteredData = [];
@@ -13,15 +16,40 @@ const COLORS = {
   navy: "#405B73",
   cream: "#FFF8F3",
   gray: "#C7D0D6",
-  dark: "#20303C"
+  dark: "#263746"
 };
 
 const MILESTONES = [
-  { name: "CAD received", plan: ["TP/CAD Handover (Plan)"], actual: ["TP/ CAD received (Actual)"] },
-  { name: "Material arrived", plan: ["Material  Arrive (Plan)"], actual: ["Latest  Material Arrive (Actual)"] },
-  { name: "Pattern lock", plan: ["Pattern lock (Plan)"], actual: ["Pattern locked (Actual)"] },
-  { name: "Tooling lock", plan: ["Tooling lock (Plan)"], actual: ["Tooling locked (Actual)"] },
-  { name: "Mold finished", plan: ["Mold ETC (Plan)"], actual: ["Mold finished (Actual)"] }
+  {
+    name: "CAD received",
+    shortName: "CAD",
+    plan: ["TP/CAD Handover (Plan)"],
+    actual: ["TP/ CAD received (Actual)"]
+  },
+  {
+    name: "Material arrived",
+    shortName: "Material",
+    plan: ["Material  Arrive (Plan)", "Material Arrive (Plan)"],
+    actual: ["Latest  Material Arrive (Actual)", "Latest Material Arrive (Actual)"]
+  },
+  {
+    name: "Pattern locked",
+    shortName: "Pattern",
+    plan: ["Pattern lock (Plan)"],
+    actual: ["Pattern locked (Actual)"]
+  },
+  {
+    name: "Tooling locked",
+    shortName: "Tooling",
+    plan: ["Tooling lock (Plan)"],
+    actual: ["Tooling locked (Actual)"]
+  },
+  {
+    name: "Mold finished",
+    shortName: "Mold",
+    plan: ["Mold ETC (Plan)"],
+    actual: ["Mold finished (Actual)"]
+  }
 ];
 
 const excelFile = document.getElementById("excelFile");
@@ -34,8 +62,9 @@ excelFile.addEventListener("change", loadWorkbook);
 generateBtn.addEventListener("click", generateDashboard);
 document.getElementById("resetBtn").addEventListener("click", resetFilters);
 document.getElementById("healthStage").addEventListener("change", updateDashboard);
-document.getElementById("tableSearch").addEventListener("input", e => {
-  searchTerm = e.target.value.trim().toLowerCase();
+document.getElementById("flowDetail").addEventListener("change", drawSankey);
+document.getElementById("tableSearch").addEventListener("input", event => {
+  searchTerm = event.target.value.trim().toLowerCase();
   renderTable();
 });
 
@@ -44,16 +73,19 @@ function loadWorkbook(event) {
   if (!file) return;
 
   document.getElementById("fileName").textContent = file.name;
-  document.getElementById("fileMeta").textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+  document.getElementById("fileMeta").textContent =
+    `${(file.size / 1024 / 1024).toFixed(2)} MB`;
 
   const reader = new FileReader();
-  reader.onload = e => {
-    workbook = XLSX.read(new Uint8Array(e.target.result), {
+
+  reader.onload = readEvent => {
+    workbook = XLSX.read(new Uint8Array(readEvent.target.result), {
       type: "array",
       cellDates: true
     });
 
     sheetSelect.innerHTML = "";
+
     workbook.SheetNames.forEach(name => {
       const option = document.createElement("option");
       option.value = name;
@@ -64,18 +96,21 @@ function loadWorkbook(event) {
     const defaultSheet = workbook.SheetNames.find(name =>
       normalize(name).includes("development tracking")
     );
+
     if (defaultSheet) sheetSelect.value = defaultSheet;
 
     sheetSelect.disabled = false;
     generateBtn.disabled = false;
-    loadBadge.textContent = `${workbook.SheetNames.length} sheets loaded`;
+    loadBadge.textContent = `${workbook.SheetNames.length} sheets loaded • ${APP_VERSION}`;
     loadBadge.classList.add("loaded");
   };
+
   reader.readAsArrayBuffer(file);
 }
 
 function generateDashboard() {
   const sheet = workbook.Sheets[sheetSelect.value];
+
   const rows = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: "",
@@ -83,13 +118,16 @@ function generateDashboard() {
   });
 
   const headerRowIndex = findHeaderRow(rows);
+
   if (headerRowIndex < 0) {
-    alert("Could not find the header row containing Season, DEV. Stage and DEV. Code.");
+    alert("The header row could not be found. Please choose the Development Tracking sheet.");
     return;
   }
 
   headers = rows[headerRowIndex].map(value => String(value ?? "").trim());
-  rawData = rows.slice(headerRowIndex + 1)
+
+  rawData = rows
+    .slice(headerRowIndex + 1)
     .filter(row => row.some(value => value !== "" && value !== null))
     .map(row => {
       const record = {};
@@ -116,7 +154,10 @@ function findHeaderRow(rows) {
 }
 
 function normalize(value) {
-  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 function text(value) {
@@ -125,17 +166,19 @@ function text(value) {
 
 function getCol(row, aliases) {
   const keys = Object.keys(row);
+
   for (const alias of aliases) {
-    const target = normalize(alias);
-    const exact = keys.find(key => normalize(key) === target);
+    const wanted = normalize(alias);
+    const exact = keys.find(key => normalize(key) === wanted);
     if (exact) return row[exact];
   }
+
   return "";
 }
 
-function distinctCount(data, columnAliases) {
+function distinctCount(data, aliases) {
   return new Set(
-    data.map(row => text(getCol(row, columnAliases))).filter(Boolean)
+    data.map(row => text(getCol(row, aliases))).filter(Boolean)
   ).size;
 }
 
@@ -149,7 +192,7 @@ function buildFilters() {
   Object.values(choiceControls).forEach(control => control.destroy());
   choiceControls = {};
 
-  const configs = [
+  const filterConfigs = [
     ["seasonFilter", ["Season"]],
     ["stageFilter", ["DEV. Stage"]],
     ["factoryFilter", ["Factory"]],
@@ -157,9 +200,10 @@ function buildFilters() {
     ["modelFilter", ["Model"]]
   ];
 
-  configs.forEach(([id, aliases]) => {
+  filterConfigs.forEach(([id, aliases]) => {
     const element = document.getElementById(id);
     element.innerHTML = "";
+
     uniqueValues(rawData, aliases).forEach(value => {
       const option = document.createElement("option");
       option.value = value;
@@ -176,6 +220,7 @@ function buildFilters() {
       placeholderValue: "Select values",
       itemSelectText: ""
     });
+
     element.addEventListener("change", applyFilters);
     choiceControls[id] = control;
   });
@@ -202,6 +247,7 @@ function applyFilters() {
       material: text(getCol(row, ["Material Indicator"])),
       model: text(getCol(row, ["Model"]))
     };
+
     return Object.keys(selections).every(key =>
       selections[key].length === 0 || selections[key].includes(values[key])
     );
@@ -211,17 +257,19 @@ function applyFilters() {
 }
 
 function resetFilters() {
+  const aliasMap = {
+    seasonFilter: ["Season"],
+    stageFilter: ["DEV. Stage"],
+    factoryFilter: ["Factory"],
+    materialFilter: ["Material Indicator"],
+    modelFilter: ["Model"]
+  };
+
   Object.entries(choiceControls).forEach(([id, control]) => {
-    const aliases = {
-      seasonFilter: ["Season"],
-      stageFilter: ["DEV. Stage"],
-      factoryFilter: ["Factory"],
-      materialFilter: ["Material Indicator"],
-      modelFilter: ["Model"]
-    }[id];
     control.removeActiveItems();
-    control.setChoiceByValue(uniqueValues(rawData, aliases));
+    control.setChoiceByValue(uniqueValues(rawData, aliasMap[id]));
   });
+
   searchTerm = "";
   document.getElementById("tableSearch").value = "";
   applyFilters();
@@ -238,18 +286,24 @@ function isActive(row) {
 
 function stageRows(stage, data = filteredData) {
   const target = normalize(stage);
+
   if (target === "cfm") {
     return data.filter(row =>
       normalize(getCol(row, ["DEV. Stage"])) === "sms" && isActive(row)
     );
   }
-  return data.filter(row => normalize(getCol(row, ["DEV. Stage"])) === target);
+
+  return data.filter(row =>
+    normalize(getCol(row, ["DEV. Stage"])) === target
+  );
 }
 
 function stageCount(stage, status = "all", data = filteredData) {
   let rows = stageRows(stage, data);
+
   if (status === "drop") rows = rows.filter(isDropped);
   if (status === "active") rows = rows.filter(isActive);
+
   return distinctCount(rows, ["DEV. Code"]);
 }
 
@@ -263,94 +317,139 @@ function getWaterfallData() {
   const cfm = Math.max(sms - smsDrop, 0);
 
   return {
-    labels: ["LR2 total", "LR2 dropped", "FLC total", "FLC dropped", "SMS total", "SMS dropped", "CFM"],
+    labels: [
+      "LR2 total",
+      "LR2 dropped",
+      "FLC total",
+      "FLC dropped",
+      "SMS total",
+      "SMS dropped",
+      "CFM"
+    ],
     values: [lr2, -lr2Drop, flc, -flcDrop, sms, -smsDrop, cfm],
-    measures: ["absolute", "relative", "absolute", "relative", "absolute", "relative", "absolute"],
+    measures: [
+      "absolute",
+      "relative",
+      "absolute",
+      "relative",
+      "absolute",
+      "relative",
+      "absolute"
+    ],
     cfm
   };
 }
 
 function parseExcelDate(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (parsed) return new Date(parsed.y, parsed.m - 1, parsed.d);
   }
-  const s = text(value);
-  if (!s) return null;
-  const timestamp = Date.parse(s);
+
+  const stringValue = text(value);
+  if (!stringValue) return null;
+
+  const timestamp = Date.parse(stringValue);
   return Number.isNaN(timestamp) ? null : new Date(timestamp);
 }
 
 function semanticStatus(value) {
-  const s = normalize(value);
-  if (!s) return "blank";
-  if (["-", "n/a", "na", "no need", "none", "not required"].includes(s)) return "exempt";
-  if (/(existing|locked|arrived|finished|completed|complete|approved|pass|sent)/.test(s)) return "complete";
+  const status = normalize(value);
+
+  if (!status) return "blank";
+
+  if (["-", "n/a", "na", "no need", "none", "not required"].includes(status)) {
+    return "exempt";
+  }
+
+  if (/(existing|locked|arrived|finished|completed|complete|approved|pass|sent)/.test(status)) {
+    return "complete";
+  }
+
   return "other";
 }
 
 function milestoneOutcome(row, milestone) {
   const planRaw = getCol(row, milestone.plan);
   const actualRaw = getCol(row, milestone.actual);
+
   const planState = semanticStatus(planRaw);
   const actualState = semanticStatus(actualRaw);
 
-  if (planState === "exempt" || actualState === "exempt") return { score: 1, status: "exempt" };
-  if (actualState === "complete") return { score: 1, status: "ontime" };
+  if (planState === "exempt" || actualState === "exempt") {
+    return { score: 1, status: "not-needed" };
+  }
+
+  if (actualState === "complete") {
+    return { score: 1, status: "on-time" };
+  }
 
   const planDate = parseExcelDate(planRaw);
   const actualDate = parseExcelDate(actualRaw);
 
   if (planDate && actualDate) {
     const delayDays = Math.ceil((actualDate - planDate) / 86400000);
+
     return delayDays <= 0
-      ? { score: 1, status: "ontime", delayDays }
+      ? { score: 1, status: "on-time", delayDays }
       : { score: 0, status: "late", delayDays };
   }
 
-  if (!planDate && actualDate) return { score: 1, status: "ontime" };
+  if (!planDate && actualDate) {
+    return { score: 1, status: "on-time" };
+  }
 
   if (planDate && !actualDate) {
-    const overdue = Date.now() > planDate.getTime();
-    return overdue
+    return Date.now() > planDate.getTime()
       ? { score: 0, status: "overdue" }
       : { score: null, status: "not-due" };
   }
 
-  if (actualState === "other") return { score: 1, status: "ontime" };
+  if (actualState === "other") {
+    return { score: 1, status: "on-time" };
+  }
+
   return { score: null, status: "unknown" };
 }
 
 function milestoneMetrics(stage) {
   const rows = stageRows(stage);
+
   const metrics = MILESTONES.map(milestone => {
-    const devOutcomes = new Map();
+    const outcomesByDev = new Map();
 
     rows.forEach(row => {
-      const dev = text(getCol(row, ["DEV. Code"]));
-      if (!dev) return;
-      const outcome = milestoneOutcome(row, milestone);
-      const previous = devOutcomes.get(dev);
+      const devCode = text(getCol(row, ["DEV. Code"]));
+      if (!devCode) return;
 
-      // Conservative deduplication: a late/overdue record wins over an on-time duplicate.
+      const outcome = milestoneOutcome(row, milestone);
+      const previous = outcomesByDev.get(devCode);
+
       if (!previous || outcome.score === 0 || previous.score === null) {
-        devOutcomes.set(dev, outcome);
+        outcomesByDev.set(devCode, outcome);
       }
     });
 
-    const eligible = [...devOutcomes.values()].filter(x => x.score !== null);
-    const successes = eligible.filter(x => x.score === 1).length;
+    const eligible = [...outcomesByDev.values()].filter(item => item.score !== null);
+    const onTime = eligible.filter(item => item.score === 1).length;
+
     return {
       name: milestone.name,
-      rate: eligible.length ? Math.round(successes / eligible.length * 100) : 0,
+      shortName: milestone.shortName,
+      rate: eligible.length ? Math.round(onTime / eligible.length * 100) : 0,
       eligible: eligible.length
     };
   });
 
   const totalEligible = metrics.reduce((sum, item) => sum + item.eligible, 0);
+
   const weightedRate = totalEligible
-    ? Math.round(metrics.reduce((sum, item) => sum + item.rate * item.eligible, 0) / totalEligible)
+    ? Math.round(
+        metrics.reduce((sum, item) => sum + item.rate * item.eligible, 0) /
+        totalEligible
+      )
     : 0;
 
   return { metrics, weightedRate };
@@ -358,24 +457,34 @@ function milestoneMetrics(stage) {
 
 function overallMilestoneRate() {
   const stages = ["LR2", "FLC", "SMS"];
-  let numerator = 0;
-  let denominator = 0;
+  let weightedPoints = 0;
+  let totalEligible = 0;
+
   stages.forEach(stage => {
-    const { metrics } = milestoneMetrics(stage);
-    metrics.forEach(item => {
-      numerator += item.rate * item.eligible;
-      denominator += item.eligible;
+    const result = milestoneMetrics(stage);
+
+    result.metrics.forEach(item => {
+      weightedPoints += item.rate * item.eligible;
+      totalEligible += item.eligible;
     });
   });
-  return denominator ? Math.round(numerator / denominator) : 0;
+
+  return totalEligible ? Math.round(weightedPoints / totalEligible) : 0;
 }
 
 function updateDashboard() {
   const waterfall = getWaterfallData();
-  document.getElementById("kpiDev").textContent = distinctCount(filteredData, ["DEV. Code"]);
-  document.getElementById("kpiHealth").textContent = `${overallMilestoneRate()}%`;
+
+  document.getElementById("kpiDev").textContent =
+    distinctCount(filteredData, ["DEV. Code"]);
+
+  document.getElementById("kpiHealth").textContent =
+    `${overallMilestoneRate()}%`;
+
   document.getElementById("kpiCfm").textContent = waterfall.cfm;
-  document.getElementById("kpiModels").textContent = distinctCount(filteredData, ["Model"]);
+
+  document.getElementById("kpiModels").textContent =
+    distinctCount(filteredData, ["Model"]);
 
   drawWaterfall(waterfall);
   drawHealth();
@@ -388,34 +497,73 @@ function baseLayout(extra = {}) {
   return {
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Inter, sans-serif", color: COLORS.dark, size: 12 },
+    font: {
+      family: "Nunito, Tahoma, sans-serif",
+      color: COLORS.dark,
+      size: 12
+    },
     margin: { l: 48, r: 20, t: 20, b: 55 },
     ...extra
   };
 }
 
-const plotConfig = { responsive: true, displayModeBar: false };
+const plotConfig = {
+  responsive: true,
+  displayModeBar: false
+};
 
 function drawWaterfall(data) {
-  Plotly.react("waterfallChart", [{
-    type: "waterfall",
-    orientation: "v",
-    measure: data.measures,
-    x: data.labels,
-    y: data.values,
-    text: data.values.map(v => `${v > 0 && !data.labels[data.values.indexOf(v)].includes("dropped") ? "" : ""}${v}`),
-    textposition: "inside",
-    textfont: { color: "#ffffff", size: 12 },
-    connector: { line: { color: "#AAB4BB", width: 1 } },
-    increasing: { marker: { color: COLORS.teal, line: { color: "#ffffff", width: 1 } } },
-    decreasing: { marker: { color: COLORS.coral, line: { color: "#ffffff", width: 1 } } },
-    totals: { marker: { color: COLORS.navy, line: { color: "#ffffff", width: 1 } } },
-    hovertemplate: "%{x}<br><b>%{y}</b> DEV codes<extra></extra>"
-  }], baseLayout({
-    showlegend: false,
-    xaxis: { fixedrange: true, tickangle: -20, showgrid: false, zeroline: false },
-    yaxis: { fixedrange: true, rangemode: "tozero", gridcolor: "#EFE7E1", zerolinecolor: "#B9C1C6" }
-  }), plotConfig);
+  Plotly.react(
+    "waterfallChart",
+    [{
+      type: "waterfall",
+      orientation: "v",
+      measure: data.measures,
+      x: data.labels,
+      y: data.values,
+      text: data.values.map(value => String(value)),
+      textposition: "inside",
+      textfont: { color: "#ffffff", size: 12 },
+      connector: {
+        line: { color: "#9CA9B2", width: 1 }
+      },
+      increasing: {
+        marker: {
+          color: COLORS.teal,
+          line: { color: "#ffffff", width: 1 }
+        }
+      },
+      decreasing: {
+        marker: {
+          color: COLORS.coral,
+          line: { color: "#ffffff", width: 1 }
+        }
+      },
+      totals: {
+        marker: {
+          color: COLORS.navy,
+          line: { color: "#ffffff", width: 1 }
+        }
+      },
+      hovertemplate: "%{x}<br><b>%{y}</b> DEV codes<extra></extra>"
+    }],
+    baseLayout({
+      showlegend: false,
+      xaxis: {
+        fixedrange: true,
+        tickangle: -20,
+        showgrid: false,
+        zeroline: false
+      },
+      yaxis: {
+        fixedrange: true,
+        rangemode: "tozero",
+        gridcolor: "#EAE4DE",
+        zerolinecolor: "#AAB4BB"
+      }
+    }),
+    plotConfig
+  );
 }
 
 function scoreColor(rate) {
@@ -429,174 +577,420 @@ function drawHealth() {
   const stage = document.getElementById("healthStage").value;
   const { metrics, weightedRate } = milestoneMetrics(stage);
 
-  Plotly.react("healthChart", [{
-    type: "pie",
-    labels: metrics.map(x => `${x.name}<br>${x.rate}%`),
-    values: metrics.map(() => 1),
-    hole: .58,
-    sort: false,
-    direction: "clockwise",
-    marker: {
-      colors: metrics.map(x => scoreColor(x.rate)),
-      line: { color: "#ffffff", width: 4 }
-    },
-    textinfo: "label",
-    textposition: "inside",
-    textfont: { color: "#ffffff", size: 11 },
-    hovertemplate: "%{label}<extra></extra>"
-  }], baseLayout({
-    margin: { l: 10, r: 10, t: 10, b: 10 },
-    showlegend: false,
-    annotations: [{
-      text: `<b>${stage}</b><br><span style="font-size:28px">${weightedRate}%</span><br><span style="font-size:11px;color:#71808D">on time</span>`,
-      x: .5, y: .5, showarrow: false, align: "center"
-    }]
-  }), plotConfig);
+  const angles = [0, 72, 144, 216, 288];
+
+  Plotly.react(
+    "healthChart",
+    [{
+      type: "barpolar",
+      r: metrics.map(item => Math.max(item.rate, 4)),
+      theta: angles,
+      width: metrics.map(() => 62),
+      marker: {
+        color: metrics.map(item => scoreColor(item.rate)),
+        line: { color: "#ffffff", width: 4 }
+      },
+      customdata: metrics.map(item => [item.name, item.rate, item.eligible]),
+      hovertemplate:
+        "<b>%{customdata[0]}</b><br>" +
+        "On time: %{customdata[1]}%<br>" +
+        "DEV codes checked: %{customdata[2]}<extra></extra>"
+    }],
+    baseLayout({
+      margin: { l: 15, r: 15, t: 25, b: 20 },
+      polar: {
+        bgcolor: "rgba(0,0,0,0)",
+        radialaxis: {
+          visible: false,
+          range: [0, 105]
+        },
+        angularaxis: {
+          visible: false,
+          rotation: 90,
+          direction: "clockwise"
+        }
+      },
+      showlegend: false,
+      annotations: [
+        {
+          text:
+            `<b>${stage}</b><br>` +
+            `<span style="font-size:30px">${weightedRate}%</span><br>` +
+            `<span style="font-size:11px;color:#70808E">on time</span>`,
+          x: 0.5,
+          y: 0.5,
+          showarrow: false,
+          align: "center"
+        },
+        ...metrics.map((item, index) => {
+          const radians = angles[index] * Math.PI / 180;
+          const radius = 0.40;
+          return {
+            text: `<b>${item.shortName}</b><br>${item.rate}%`,
+            x: 0.5 + radius * Math.sin(radians),
+            y: 0.5 + radius * Math.cos(radians),
+            showarrow: false,
+            font: {
+              color: "#ffffff",
+              size: 11,
+              family: "Nunito, Tahoma, sans-serif"
+            },
+            align: "center"
+          };
+        })
+      ]
+    }),
+    plotConfig
+  );
+
+  renderHealthSummary(metrics);
 }
 
-function sankeyRows() {
+function renderHealthSummary(metrics) {
+  const container = document.getElementById("healthSummary");
+
+  container.innerHTML = metrics.map(item => `
+    <div class="health-item" style="border-left-color:${scoreColor(item.rate)}">
+      <strong>${item.rate}%</strong>
+      <span>${escapeHtml(item.name)}</span>
+    </div>
+  `).join("");
+}
+
+function buildMaterialLinks() {
   const stages = ["LR2", "FLC", "SMS", "CFM"];
+
   const materials = uniqueValues(filteredData, ["Material Indicator"])
     .filter(value => ["TN", "NU", "CONC"].includes(value.toUpperCase()));
 
   const links = [];
+
   stages.forEach(stage => {
     const rows = stageRows(stage);
+
     materials.forEach(material => {
       const count = distinctCount(
-        rows.filter(row => text(getCol(row, ["Material Indicator"])) === material),
+        rows.filter(row =>
+          text(getCol(row, ["Material Indicator"])) === material
+        ),
         ["DEV. Code"]
       );
+
       if (count > 0) links.push({ stage, material, count });
     });
   });
+
   return { stages, materials, links };
 }
 
-function drawSankey() {
-  const { stages, materials, links } = sankeyRows();
-  const labels = [...stages, ...materials];
-  const stageColors = [COLORS.orange, COLORS.coral, COLORS.cyan, COLORS.navy];
-  const materialColors = materials.map((_, i) => [COLORS.teal, "#91C9C0", "#E8C988"][i % 3]);
+function topGenderModels(limit = 8) {
+  const counts = new Map();
 
-  Plotly.react("sankeyChart", [{
-    type: "sankey",
-    arrangement: "snap",
-    node: {
-      label: labels,
-      color: [...stageColors, ...materialColors],
-      pad: 24,
-      thickness: 20,
-      line: { color: "#ffffff", width: 1 }
-    },
-    link: {
-      source: links.map(x => labels.indexOf(x.stage)),
-      target: links.map(x => labels.indexOf(x.material)),
-      value: links.map(x => x.count),
-      color: links.map(x => {
-        const base = stageColors[stages.indexOf(x.stage)];
-        return hexToRgba(base, .45);
+  filteredData.forEach(row => {
+    const value = text(getCol(row, ["Gender / Model", "Gender_Model"]));
+    const devCode = text(getCol(row, ["DEV. Code"]));
+
+    if (!value || !devCode) return;
+
+    if (!counts.has(value)) counts.set(value, new Set());
+    counts.get(value).add(devCode);
+  });
+
+  return [...counts.entries()]
+    .map(([name, set]) => ({ name, count: set.size }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map(item => item.name);
+}
+
+function drawSankey() {
+  const detailMode = document.getElementById("flowDetail").value;
+  const { stages, materials, links: stageMaterialLinks } = buildMaterialLinks();
+
+  const stageColors = [
+    COLORS.orange,
+    COLORS.coral,
+    COLORS.cyan,
+    COLORS.navy
+  ];
+
+  const materialColors = materials.map((_, index) =>
+    [COLORS.teal, "#88C8BF", "#D8B767"][index % 3]
+  );
+
+  if (detailMode === "materialOnly") {
+    const labels = [...stages, ...materials];
+
+    Plotly.react(
+      "sankeyChart",
+      [{
+        type: "sankey",
+        arrangement: "snap",
+        node: {
+          label: labels,
+          color: [...stageColors, ...materialColors],
+          pad: 23,
+          thickness: 19,
+          line: { color: "#ffffff", width: 1 }
+        },
+        link: {
+          source: stageMaterialLinks.map(item => labels.indexOf(item.stage)),
+          target: stageMaterialLinks.map(item => labels.indexOf(item.material)),
+          value: stageMaterialLinks.map(item => item.count),
+          color: stageMaterialLinks.map(item =>
+            hexToRgba(stageColors[stages.indexOf(item.stage)], 0.45)
+          ),
+          hovertemplate:
+            "%{source.label} → %{target.label}<br>" +
+            "<b>%{value}</b> DEV codes<extra></extra>"
+        }
+      }],
+      baseLayout({
+        margin: { l: 10, r: 10, t: 18, b: 18 }
       }),
-      customdata: links.map(x => x.count),
-      hovertemplate: "%{source.label} → %{target.label}<br><b>%{value}</b> DEV codes<extra></extra>"
-    }
-  }], baseLayout({
-    margin: { l: 10, r: 10, t: 18, b: 18 }
-  }), plotConfig);
+      plotConfig
+    );
+
+    return;
+  }
+
+  const topGroups = topGenderModels(8);
+  const genderLabels = [...topGroups, "Other"];
+  const labels = [...stages, ...materials, ...genderLabels];
+
+  const materialGenderLinks = [];
+
+  materials.forEach(material => {
+    const rows = filteredData.filter(row =>
+      text(getCol(row, ["Material Indicator"])) === material
+    );
+
+    genderLabels.forEach(group => {
+      const groupRows = rows.filter(row => {
+        const genderModel = text(getCol(row, ["Gender / Model", "Gender_Model"]));
+
+        if (group === "Other") {
+          return genderModel && !topGroups.includes(genderModel);
+        }
+
+        return genderModel === group;
+      });
+
+      const count = distinctCount(groupRows, ["DEV. Code"]);
+
+      if (count > 0) {
+        materialGenderLinks.push({ material, group, count });
+      }
+    });
+  });
+
+  const allLinks = [
+    ...stageMaterialLinks.map(item => ({
+      source: labels.indexOf(item.stage),
+      target: labels.indexOf(item.material),
+      value: item.count,
+      color: hexToRgba(stageColors[stages.indexOf(item.stage)], 0.42)
+    })),
+    ...materialGenderLinks.map(item => ({
+      source: labels.indexOf(item.material),
+      target: labels.indexOf(item.group),
+      value: item.count,
+      color: hexToRgba(
+        materialColors[materials.indexOf(item.material)],
+        0.38
+      )
+    }))
+  ];
+
+  Plotly.react(
+    "sankeyChart",
+    [{
+      type: "sankey",
+      arrangement: "snap",
+      node: {
+        label: labels,
+        color: [
+          ...stageColors,
+          ...materialColors,
+          ...genderLabels.map(() => "#9BA9B4")
+        ],
+        pad: 18,
+        thickness: 17,
+        line: { color: "#ffffff", width: 1 }
+      },
+      link: {
+        source: allLinks.map(item => item.source),
+        target: allLinks.map(item => item.target),
+        value: allLinks.map(item => item.value),
+        color: allLinks.map(item => item.color),
+        hovertemplate:
+          "%{source.label} → %{target.label}<br>" +
+          "<b>%{value}</b> DEV codes<extra></extra>"
+      }
+    }],
+    baseLayout({
+      margin: { l: 10, r: 10, t: 18, b: 18 }
+    }),
+    plotConfig
+  );
 }
 
 function hexToRgba(hex, alpha) {
   const value = hex.replace("#", "");
-  const bigint = parseInt(value, 16);
-  return `rgba(${(bigint >> 16) & 255},${(bigint >> 8) & 255},${bigint & 255},${alpha})`;
+  const number = parseInt(value, 16);
+
+  return `rgba(${(number >> 16) & 255},${(number >> 8) & 255},${number & 255},${alpha})`;
 }
 
 function drawHeatmap() {
   const models = uniqueValues(filteredData, ["Model"])
     .map(model => ({
       model,
-      count: distinctCount(filteredData.filter(row => text(getCol(row, ["Model"])) === model), ["DEV. Code"])
+      count: distinctCount(
+        filteredData.filter(row =>
+          text(getCol(row, ["Model"])) === model
+        ),
+        ["DEV. Code"]
+      )
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 20)
-    .map(x => x.model);
+    .map(item => item.model);
 
   const stages = ["LR2", "FLC", "SMS", "CFM"];
-  const z = models.map(model => {
-    const modelRows = filteredData.filter(row => text(getCol(row, ["Model"])) === model);
-    const counts = stages.map(stage => distinctCount(
-      stageRows(stage, modelRows), ["DEV. Code"]
-    ));
-    const denominator = counts.reduce((sum, value, index) =>
-      sum + (index === 3 ? 0 : value), 0
-    ) || 1;
 
-    // CFM is derived from SMS active, so percentage uses unique base stages as denominator.
-    return counts.map(value => Math.round(value / denominator * 100));
+  const percentages = models.map(model => {
+    const modelRows = filteredData.filter(row =>
+      text(getCol(row, ["Model"])) === model
+    );
+
+    const counts = stages.map(stage =>
+      distinctCount(stageRows(stage, modelRows), ["DEV. Code"])
+    );
+
+    const baseTotal =
+      counts[0] + counts[1] + counts[2] || 1;
+
+    return counts.map(value =>
+      Math.round(value / baseTotal * 100)
+    );
   });
 
-  Plotly.react("heatmapChart", [{
-    type: "heatmap",
-    x: stages,
-    y: models,
-    z,
-    zmin: 0,
-    zmax: 100,
-    colorscale: [
-      [0, "#FFF4E7"],
-      [.35, "#F6C27A"],
-      [.65, "#59C3A5"],
-      [1, "#405B73"]
-    ],
-    text: z.map(row => row.map(value => `${value}%`)),
-    texttemplate: "%{text}",
-    textfont: { size: 11 },
-    hovertemplate: "%{y}<br>%{x}: <b>%{z}%</b><extra></extra>",
-    colorbar: { title: "Share", ticksuffix: "%", thickness: 12 }
-  }], baseLayout({
-    margin: { l: 120, r: 55, t: 20, b: 45 },
-    xaxis: { side: "top", fixedrange: true, showgrid: false },
-    yaxis: { fixedrange: true, autorange: "reversed", tickfont: { size: 10 } }
-  }), plotConfig);
+  Plotly.react(
+    "heatmapChart",
+    [{
+      type: "heatmap",
+      x: stages,
+      y: models,
+      z: percentages,
+      zmin: 0,
+      zmax: 100,
+      colorscale: [
+        [0, "#FFF3E4"],
+        [0.35, "#F2C377"],
+        [0.65, "#66BBA2"],
+        [1, "#405B73"]
+      ],
+      text: percentages.map(row =>
+        row.map(value => `${value}%`)
+      ),
+      texttemplate: "%{text}",
+      textfont: { size: 11 },
+      hovertemplate:
+        "%{y}<br>%{x}: <b>%{z}%</b><extra></extra>",
+      colorbar: {
+        title: "Share",
+        ticksuffix: "%",
+        thickness: 12
+      }
+    }],
+    baseLayout({
+      margin: { l: 120, r: 55, t: 20, b: 45 },
+      xaxis: {
+        side: "top",
+        fixedrange: true,
+        showgrid: false
+      },
+      yaxis: {
+        fixedrange: true,
+        autorange: "reversed",
+        tickfont: { size: 10 }
+      }
+    }),
+    plotConfig
+  );
 }
 
 function renderTable() {
   const table = document.getElementById("detailTable");
+
   const displayHeaders = [
-    "Season", "Active/Drop", "DEV. Stage", "DEV. Code", "Factory",
-    "Model", "Gender / Model", "Material Indicator",
-    "TP/CAD Handover (Plan)", "TP/ CAD received (Actual)",
-    "Material  Arrive (Plan)", "Latest  Material Arrive (Actual)",
-    "Pattern lock (Plan)", "Pattern locked (Actual)",
-    "Tooling lock (Plan)", "Tooling locked (Actual)",
-    "Mold ETC (Plan)", "Mold finished (Actual)", "Shipment ontime"
+    "Season",
+    "Active/Drop",
+    "DEV. Stage",
+    "DEV. Code",
+    "Factory",
+    "Model",
+    "Gender / Model",
+    "Material Indicator",
+    "TP/CAD Handover (Plan)",
+    "TP/ CAD received (Actual)",
+    "Material  Arrive (Plan)",
+    "Latest  Material Arrive (Actual)",
+    "Pattern lock (Plan)",
+    "Pattern locked (Actual)",
+    "Tooling lock (Plan)",
+    "Tooling locked (Actual)",
+    "Mold ETC (Plan)",
+    "Mold finished (Actual)",
+    "Shipment ontime"
   ];
 
-  const rows = filteredData.filter(row => {
-    if (!searchTerm) return true;
-    return [
-      getCol(row, ["DEV. Code"]),
-      getCol(row, ["Model"]),
-      getCol(row, ["Factory"]),
-      getCol(row, ["Season"])
-    ].some(value => normalize(value).includes(searchTerm));
-  }).slice(0, 500);
+  const rows = filteredData
+    .filter(row => {
+      if (!searchTerm) return true;
+
+      return [
+        getCol(row, ["DEV. Code"]),
+        getCol(row, ["Model"]),
+        getCol(row, ["Factory"]),
+        getCol(row, ["Season"])
+      ].some(value =>
+        normalize(value).includes(searchTerm)
+      );
+    })
+    .slice(0, 500);
 
   table.innerHTML = `
-    <thead><tr>${displayHeaders.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+    <thead>
+      <tr>
+        ${displayHeaders.map(header =>
+          `<th>${escapeHtml(header)}</th>`
+        ).join("")}
+      </tr>
+    </thead>
     <tbody>
-      ${rows.map(row => `<tr>${
-        displayHeaders.map(header => `<td>${formatCell(getCol(row, [header]))}</td>`).join("")
-      }</tr>`).join("")}
+      ${rows.map(row => `
+        <tr>
+          ${displayHeaders.map(header =>
+            `<td>${formatCell(getCol(row, [header]))}</td>`
+          ).join("")}
+        </tr>
+      `).join("")}
     </tbody>
   `;
 }
 
 function formatCell(value) {
   const date = parseExcelDate(value);
-  if (date && (value instanceof Date || typeof value === "number")) {
+
+  if (
+    date &&
+    (value instanceof Date || typeof value === "number")
+  ) {
     return date.toLocaleDateString("en-GB");
   }
+
   return escapeHtml(text(value));
 }
 
