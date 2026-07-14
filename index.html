@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css?v=3.0.0">
+  <link rel="stylesheet" href="style.css?v=4.0.0">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -27,7 +27,7 @@
 
       <div class="header-status">
         <div id="loadBadge" class="status-badge">Waiting for file</div>
-        <div class="version-badge">Dashboard version <strong id="appVersion">v3.0.0</strong></div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v4.0.0</strong></div>
       </div>
     </header>
 
@@ -139,20 +139,45 @@
         <article class="panel chart-panel sankey-panel">
           <div class="section-head compact">
             <div>
-              <p class="section-kicker">MATERIAL AND PRODUCT MIX</p>
-              <h2>Stage → material type → gender/model</h2>
+              <p class="section-kicker">MATERIAL FLOW</p>
+              <h2>Stage → material indicator</h2>
             </div>
-
-            <select id="flowDetail" class="stage-selector wide-selector">
-              <option value="genderModel">Show Gender / Model</option>
-              <option value="materialOnly">Material only</option>
-            </select>
           </div>
 
           <div id="sankeyChart" class="chart chart-xl"></div>
-          <p class="chart-note">Small Gender / Model groups are combined as “Other” to keep the chart readable.</p>
+          <p class="chart-note">Click a flow to show the DEV codes and styles in that stage/material group.</p>
         </article>
 
+        <article class="panel material-detail-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">FLOW DETAILS</p>
+              <h2>DEV codes and styles</h2>
+            </div>
+          </div>
+
+          <div class="material-detail-controls">
+            <div class="field">
+              <label for="detailStage">Stage</label>
+              <select id="detailStage"></select>
+            </div>
+            <div class="field">
+              <label for="detailMaterial">Material indicator</label>
+              <select id="detailMaterial"></select>
+            </div>
+          </div>
+
+          <div class="material-detail-summary">
+            <strong id="materialDetailCount">0</strong>
+            <span>DEV codes</span>
+          </div>
+
+          <div id="materialDetailList" class="material-detail-list"></div>
+        </article>
+
+      </section>
+
+      <section class="visual-grid heatmap-row">
         <article class="panel chart-panel heatmap-panel">
           <div class="section-head compact">
             <div>
@@ -183,6 +208,6 @@
     </section>
   </main>
 
-  <script src="script.js?v=3.0.0"></script>
+  <script src="script.js?v=4.0.0"></script>
 </body>
 </html>

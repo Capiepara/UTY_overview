@@ -1,4 +1,4 @@
-const APP_VERSION = "v3.0.0";
+const APP_VERSION = "v4.0.0";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
 let workbook = null;
@@ -62,7 +62,8 @@ excelFile.addEventListener("change", loadWorkbook);
 generateBtn.addEventListener("click", generateDashboard);
 document.getElementById("resetBtn").addEventListener("click", resetFilters);
 document.getElementById("healthStage").addEventListener("change", updateDashboard);
-document.getElementById("flowDetail").addEventListener("change", drawSankey);
+document.getElementById("detailStage").addEventListener("change", updateMaterialDetails);
+document.getElementById("detailMaterial").addEventListener("change", updateMaterialDetails);
 document.getElementById("tableSearch").addEventListener("input", event => {
   searchTerm = event.target.value.trim().toLowerCase();
   renderTable();
@@ -489,6 +490,8 @@ function updateDashboard() {
   drawWaterfall(waterfall);
   drawHealth();
   drawSankey();
+  buildMaterialDetailSelectors();
+  updateMaterialDetails();
   drawHeatmap();
   renderTable();
 }
@@ -521,11 +524,8 @@ function drawWaterfall(data) {
       measure: data.measures,
       x: data.labels,
       y: data.values,
-      text: data.values.map(value => String(value)),
-      textposition: "inside",
-      textfont: { color: "#ffffff", size: 12 },
       connector: {
-        line: { color: "#9CA9B2", width: 1 }
+        line: { color: "#A7AEB2", width: 1 }
       },
       increasing: {
         marker: {
@@ -548,18 +548,22 @@ function drawWaterfall(data) {
       hovertemplate: "%{x}<br><b>%{y}</b> DEV codes<extra></extra>"
     }],
     baseLayout({
+      margin: { l: 16, r: 12, t: 15, b: 58 },
       showlegend: false,
       xaxis: {
         fixedrange: true,
-        tickangle: -20,
+        tickangle: -18,
         showgrid: false,
-        zeroline: false
+        zeroline: false,
+        showline: false
       },
       yaxis: {
         fixedrange: true,
-        rangemode: "tozero",
-        gridcolor: "#EAE4DE",
-        zerolinecolor: "#AAB4BB"
+        showgrid: false,
+        zeroline: false,
+        showline: false,
+        showticklabels: false,
+        ticks: ""
       }
     }),
     plotConfig
@@ -577,68 +581,54 @@ function drawHealth() {
   const stage = document.getElementById("healthStage").value;
   const { metrics, weightedRate } = milestoneMetrics(stage);
 
-  const angles = [0, 72, 144, 216, 288];
+  const values = metrics.map(() => 1);
+  const labels = metrics.map(item => `${item.shortName}<br>${item.rate}%`);
 
   Plotly.react(
     "healthChart",
     [{
-      type: "barpolar",
-      r: metrics.map(item => Math.max(item.rate, 4)),
-      theta: angles,
-      width: metrics.map(() => 62),
+      type: "pie",
+      labels: [...labels, ""],
+      values: [...values, values.reduce((sum, value) => sum + value, 0)],
+      hole: 0.57,
+      sort: false,
+      direction: "clockwise",
+      rotation: 270,
       marker: {
-        color: metrics.map(item => scoreColor(item.rate)),
-        line: { color: "#ffffff", width: 4 }
-      },
-      customdata: metrics.map(item => [item.name, item.rate, item.eligible]),
-      hovertemplate:
-        "<b>%{customdata[0]}</b><br>" +
-        "On time: %{customdata[1]}%<br>" +
-        "DEV codes checked: %{customdata[2]}<extra></extra>"
-    }],
-    baseLayout({
-      margin: { l: 15, r: 15, t: 25, b: 20 },
-      polar: {
-        bgcolor: "rgba(0,0,0,0)",
-        radialaxis: {
-          visible: false,
-          range: [0, 105]
-        },
-        angularaxis: {
-          visible: false,
-          rotation: 90,
-          direction: "clockwise"
+        colors: [
+          ...metrics.map(item => scoreColor(item.rate)),
+          "rgba(0,0,0,0)"
+        ],
+        line: {
+          color: "#ffffff",
+          width: 4
         }
       },
+      text: [...labels, ""],
+      textinfo: "text",
+      textposition: "outside",
+      textfont: {
+        color: COLORS.dark,
+        size: 12,
+        family: "Nunito, Tahoma, sans-serif"
+      },
+      pull: [0.025, 0.025, 0.025, 0.025, 0.025, 0],
+      hovertemplate: "<b>%{label}</b><extra></extra>",
+      showlegend: false
+    }],
+    baseLayout({
+      margin: { l: 45, r: 45, t: 10, b: 0 },
       showlegend: false,
-      annotations: [
-        {
-          text:
-            `<b>${stage}</b><br>` +
-            `<span style="font-size:30px">${weightedRate}%</span><br>` +
-            `<span style="font-size:11px;color:#70808E">on time</span>`,
-          x: 0.5,
-          y: 0.5,
-          showarrow: false,
-          align: "center"
-        },
-        ...metrics.map((item, index) => {
-          const radians = angles[index] * Math.PI / 180;
-          const radius = 0.40;
-          return {
-            text: `<b>${item.shortName}</b><br>${item.rate}%`,
-            x: 0.5 + radius * Math.sin(radians),
-            y: 0.5 + radius * Math.cos(radians),
-            showarrow: false,
-            font: {
-              color: "#ffffff",
-              size: 11,
-              family: "Nunito, Tahoma, sans-serif"
-            },
-            align: "center"
-          };
-        })
-      ]
+      annotations: [{
+        text:
+          `<b>${stage}</b><br>` +
+          `<span style="font-size:31px">${weightedRate}%</span><br>` +
+          `<span style="font-size:11px;color:#70808E">on time</span>`,
+        x: 0.5,
+        y: 0.53,
+        showarrow: false,
+        align: "center"
+      }]
     }),
     plotConfig
   );
@@ -683,124 +673,18 @@ function buildMaterialLinks() {
   return { stages, materials, links };
 }
 
-function topGenderModels(limit = 8) {
-  const counts = new Map();
-
-  filteredData.forEach(row => {
-    const value = text(getCol(row, ["Gender / Model", "Gender_Model"]));
-    const devCode = text(getCol(row, ["DEV. Code"]));
-
-    if (!value || !devCode) return;
-
-    if (!counts.has(value)) counts.set(value, new Set());
-    counts.get(value).add(devCode);
-  });
-
-  return [...counts.entries()]
-    .map(([name, set]) => ({ name, count: set.size }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit)
-    .map(item => item.name);
-}
-
 function drawSankey() {
-  const detailMode = document.getElementById("flowDetail").value;
-  const { stages, materials, links: stageMaterialLinks } = buildMaterialLinks();
-
+  const { stages, materials, links } = buildMaterialLinks();
+  const labels = [...stages, ...materials];
   const stageColors = [
     COLORS.orange,
     COLORS.coral,
     COLORS.cyan,
     COLORS.navy
   ];
-
   const materialColors = materials.map((_, index) =>
     [COLORS.teal, "#88C8BF", "#D8B767"][index % 3]
   );
-
-  if (detailMode === "materialOnly") {
-    const labels = [...stages, ...materials];
-
-    Plotly.react(
-      "sankeyChart",
-      [{
-        type: "sankey",
-        arrangement: "snap",
-        node: {
-          label: labels,
-          color: [...stageColors, ...materialColors],
-          pad: 23,
-          thickness: 19,
-          line: { color: "#ffffff", width: 1 }
-        },
-        link: {
-          source: stageMaterialLinks.map(item => labels.indexOf(item.stage)),
-          target: stageMaterialLinks.map(item => labels.indexOf(item.material)),
-          value: stageMaterialLinks.map(item => item.count),
-          color: stageMaterialLinks.map(item =>
-            hexToRgba(stageColors[stages.indexOf(item.stage)], 0.45)
-          ),
-          hovertemplate:
-            "%{source.label} → %{target.label}<br>" +
-            "<b>%{value}</b> DEV codes<extra></extra>"
-        }
-      }],
-      baseLayout({
-        margin: { l: 10, r: 10, t: 18, b: 18 }
-      }),
-      plotConfig
-    );
-
-    return;
-  }
-
-  const topGroups = topGenderModels(8);
-  const genderLabels = [...topGroups, "Other"];
-  const labels = [...stages, ...materials, ...genderLabels];
-
-  const materialGenderLinks = [];
-
-  materials.forEach(material => {
-    const rows = filteredData.filter(row =>
-      text(getCol(row, ["Material Indicator"])) === material
-    );
-
-    genderLabels.forEach(group => {
-      const groupRows = rows.filter(row => {
-        const genderModel = text(getCol(row, ["Gender / Model", "Gender_Model"]));
-
-        if (group === "Other") {
-          return genderModel && !topGroups.includes(genderModel);
-        }
-
-        return genderModel === group;
-      });
-
-      const count = distinctCount(groupRows, ["DEV. Code"]);
-
-      if (count > 0) {
-        materialGenderLinks.push({ material, group, count });
-      }
-    });
-  });
-
-  const allLinks = [
-    ...stageMaterialLinks.map(item => ({
-      source: labels.indexOf(item.stage),
-      target: labels.indexOf(item.material),
-      value: item.count,
-      color: hexToRgba(stageColors[stages.indexOf(item.stage)], 0.42)
-    })),
-    ...materialGenderLinks.map(item => ({
-      source: labels.indexOf(item.material),
-      target: labels.indexOf(item.group),
-      value: item.count,
-      color: hexToRgba(
-        materialColors[materials.indexOf(item.material)],
-        0.38
-      )
-    }))
-  ];
 
   Plotly.react(
     "sankeyChart",
@@ -809,20 +693,19 @@ function drawSankey() {
       arrangement: "snap",
       node: {
         label: labels,
-        color: [
-          ...stageColors,
-          ...materialColors,
-          ...genderLabels.map(() => "#9BA9B4")
-        ],
-        pad: 18,
-        thickness: 17,
+        color: [...stageColors, ...materialColors],
+        pad: 24,
+        thickness: 20,
         line: { color: "#ffffff", width: 1 }
       },
       link: {
-        source: allLinks.map(item => item.source),
-        target: allLinks.map(item => item.target),
-        value: allLinks.map(item => item.value),
-        color: allLinks.map(item => item.color),
+        source: links.map(item => labels.indexOf(item.stage)),
+        target: links.map(item => labels.indexOf(item.material)),
+        value: links.map(item => item.count),
+        color: links.map(item =>
+          hexToRgba(stageColors[stages.indexOf(item.stage)], 0.42)
+        ),
+        customdata: links.map(item => [item.stage, item.material]),
         hovertemplate:
           "%{source.label} → %{target.label}<br>" +
           "<b>%{value}</b> DEV codes<extra></extra>"
@@ -832,7 +715,98 @@ function drawSankey() {
       margin: { l: 10, r: 10, t: 18, b: 18 }
     }),
     plotConfig
+  ).then(() => {
+    const chart = document.getElementById("sankeyChart");
+
+    if (typeof chart.removeAllListeners === "function") {
+      chart.removeAllListeners("plotly_click");
+    }
+
+    chart.on("plotly_click", event => {
+      const selected = event.points?.[0]?.customdata;
+      if (!selected || selected.length < 2) return;
+
+      document.getElementById("detailStage").value = selected[0];
+      document.getElementById("detailMaterial").value = selected[1];
+      updateMaterialDetails();
+    });
+  });
+}
+
+function buildMaterialDetailSelectors() {
+  const stageSelect = document.getElementById("detailStage");
+  const materialSelect = document.getElementById("detailMaterial");
+
+  const oldStage = stageSelect.value;
+  const oldMaterial = materialSelect.value;
+
+  const stages = ["LR2", "FLC", "SMS", "CFM"];
+  const materials = uniqueValues(filteredData, ["Material Indicator"])
+    .filter(value => ["TN", "NU", "CONC"].includes(value.toUpperCase()));
+
+  stageSelect.innerHTML = stages
+    .map(stage => `<option value="${escapeHtml(stage)}">${escapeHtml(stage)}</option>`)
+    .join("");
+
+  materialSelect.innerHTML = materials
+    .map(material => `<option value="${escapeHtml(material)}">${escapeHtml(material)}</option>`)
+    .join("");
+
+  if (stages.includes(oldStage)) stageSelect.value = oldStage;
+  if (materials.includes(oldMaterial)) materialSelect.value = oldMaterial;
+}
+
+function updateMaterialDetails() {
+  const stage = document.getElementById("detailStage").value;
+  const material = document.getElementById("detailMaterial").value;
+  const list = document.getElementById("materialDetailList");
+
+  if (!stage || !material) {
+    document.getElementById("materialDetailCount").textContent = "0";
+    list.innerHTML =
+      '<div class="material-detail-empty">No matching group is available.</div>';
+    return;
+  }
+
+  const rows = stageRows(stage).filter(row =>
+    text(getCol(row, ["Material Indicator"])) === material
   );
+
+  const devMap = new Map();
+
+  rows.forEach(row => {
+    const devCode = text(getCol(row, ["DEV. Code"]));
+    if (!devCode || devMap.has(devCode)) return;
+
+    const genderModel = text(getCol(row, ["Gender / Model", "Gender_Model"]));
+    const model = text(getCol(row, ["Model"]));
+
+    devMap.set(devCode, {
+      devCode,
+      style: genderModel || model || "No style name",
+      model
+    });
+  });
+
+  const items = [...devMap.values()].sort((a, b) =>
+    a.devCode.localeCompare(b.devCode, undefined, { numeric: true })
+  );
+
+  document.getElementById("materialDetailCount").textContent = items.length;
+
+  list.innerHTML = items.length
+    ? items.map(item => `
+        <div class="material-detail-item">
+          <div class="material-detail-code">${escapeHtml(item.devCode)}</div>
+          <div class="material-detail-style">
+            ${escapeHtml(item.style)}
+            ${item.model && item.model !== item.style
+              ? `<br><span style="color:#70808E">${escapeHtml(item.model)}</span>`
+              : ""}
+          </div>
+        </div>
+      `).join("")
+    : '<div class="material-detail-empty">No DEV codes match this stage and material indicator.</div>';
 }
 
 function hexToRgba(hex, alpha) {
