@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css?v=4.0.0">
+  <link rel="stylesheet" href="style.css?v=5.0.0">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -27,7 +27,7 @@
 
       <div class="header-status">
         <div id="loadBadge" class="status-badge">Waiting for file</div>
-        <div class="version-badge">Dashboard version <strong id="appVersion">v4.0.0</strong></div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v5.0.0</strong></div>
       </div>
     </header>
 
@@ -68,7 +68,7 @@
           <div class="field"><label>Season</label><select id="seasonFilter" multiple></select></div>
           <div class="field"><label>Stage</label><select id="stageFilter" multiple></select></div>
           <div class="field"><label>Factory</label><select id="factoryFilter" multiple></select></div>
-          <div class="field"><label>Material type</label><select id="materialFilter" multiple></select></div>
+          <div class="field"><label>Material indicator</label><select id="materialFilter" multiple></select></div>
           <div class="field model-filter"><label>Model</label><select id="modelFilter" multiple></select></div>
         </div>
       </section>
@@ -80,13 +80,19 @@
           <small>Unique DEV. Code values</small>
         </article>
 
-        <article class="kpi-card accent-orange">
+        <article class="kpi-card accent-teal">
           <span>Overall on-time rate</span>
           <strong id="kpiHealth">0%</strong>
-          <small>Across five main checkpoints</small>
+          <small>Across five checkpoints</small>
         </article>
 
         <article class="kpi-card accent-coral">
+          <span>High-risk DEV codes</span>
+          <strong id="kpiRisk">0</strong>
+          <small>Risk score 60 or above</small>
+        </article>
+
+        <article class="kpi-card accent-orange">
           <span>CFM / active SMS</span>
           <strong id="kpiCfm">0</strong>
           <small>SMS total minus SMS dropped</small>
@@ -97,6 +103,16 @@
           <strong id="kpiModels">0</strong>
           <small>Unique models after filtering</small>
         </article>
+      </section>
+
+      <section class="panel insight-panel">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">KEY FINDINGS</p>
+            <h2>What needs attention</h2>
+          </div>
+        </div>
+        <div id="insightGrid" class="insight-grid"></div>
       </section>
 
       <section class="visual-grid top-row">
@@ -116,7 +132,6 @@
               <p class="section-kicker">ON-TIME CHECK</p>
               <h2>Plan compared with actual</h2>
             </div>
-
             <select id="healthStage" class="stage-selector">
               <option value="LR2">LR2</option>
               <option value="FLC">FLC</option>
@@ -126,24 +141,42 @@
           </div>
 
           <div id="healthChart" class="chart chart-large"></div>
-
           <div id="healthSummary" class="health-summary"></div>
-
-          <p class="chart-note">
-            “No need”, “-”, “N/A”, existing, locked and arrived are counted as on time.
-          </p>
+          <p class="chart-note">“No need”, “-”, “N/A”, existing, locked and arrived are counted as on time.</p>
         </article>
       </section>
 
-      <section class="visual-grid bottom-row">
-        <article class="panel chart-panel sankey-panel">
+      <section class="visual-grid analysis-row">
+        <article class="panel chart-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">FACTORY VIEW</p>
+              <h2>Factory on-time ranking</h2>
+            </div>
+          </div>
+          <div id="factoryChart" class="chart chart-medium"></div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">DELAY VIEW</p>
+              <h2>Average delay by model and checkpoint</h2>
+            </div>
+          </div>
+          <div id="delayHeatmap" class="chart chart-medium"></div>
+          <p class="chart-note">The heatmap shows average late days. Blank cells do not have enough comparable dates.</p>
+        </article>
+      </section>
+
+      <section class="visual-grid material-row">
+        <article class="panel chart-panel">
           <div class="section-head compact">
             <div>
               <p class="section-kicker">MATERIAL FLOW</p>
               <h2>Stage → material indicator</h2>
             </div>
           </div>
-
           <div id="sankeyChart" class="chart chart-xl"></div>
           <p class="chart-note">Click a flow to show the DEV codes and styles in that stage/material group.</p>
         </article>
@@ -174,21 +207,29 @@
 
           <div id="materialDetailList" class="material-detail-list"></div>
         </article>
-
       </section>
 
-      <section class="visual-grid heatmap-row">
-        <article class="panel chart-panel heatmap-panel">
-          <div class="section-head compact">
-            <div>
-              <p class="section-kicker">MODEL VIEW</p>
-              <h2>How each model is split by stage</h2>
-            </div>
+      <section class="panel critical-panel">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">PRIORITY LIST</p>
+            <h2>DEV codes with the highest risk</h2>
           </div>
+        </div>
+        <div class="table-wrap critical-wrap">
+          <table id="criticalTable"></table>
+        </div>
+      </section>
 
-          <div id="heatmapChart" class="chart chart-xl"></div>
-          <p class="chart-note">Each row totals 100%. Darker cells mean a larger share for that model.</p>
-        </article>
+      <section class="panel timeline-panel">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">SELECTED DEV TIMELINE</p>
+            <h2>Plan and actual dates</h2>
+          </div>
+          <select id="timelineDev" class="timeline-selector"></select>
+        </div>
+        <div id="timelineChart" class="chart chart-medium"></div>
       </section>
 
       <section class="panel detail-panel">
@@ -197,10 +238,8 @@
             <p class="section-kicker">DETAILS</p>
             <h2>Filtered DEV codes</h2>
           </div>
-
           <input id="tableSearch" class="search-input" placeholder="Search DEV code, model or factory" />
         </div>
-
         <div class="table-wrap">
           <table id="detailTable"></table>
         </div>
@@ -208,6 +247,6 @@
     </section>
   </main>
 
-  <script src="script.js?v=4.0.0"></script>
+  <script src="script.js?v=5.0.0"></script>
 </body>
 </html>
