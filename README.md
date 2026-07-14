@@ -1,4 +1,4 @@
-# UTY Development Dashboard v4.1.0
+# UTY Development Dashboard v4.1.2
 
 Replace these files in the GitHub Pages repository root:
 
@@ -6,10 +6,11 @@ Replace these files in the GitHub Pages repository root:
 - style.css
 - script.js
 
-Changes:
-- Filter background changed to #023E8A
-- On-time check redesigned as a five-part radial infographic
-- Waterfall value labels added
-- Waterfall grid and Y-axis kept hidden
-- Header made more compact
-- Visible version/build marker v4.1.0
+Fixes:
+- On-time check rebuilt as an SVG infographic
+- Five left-side radial sectors, matching the supplied reference layout
+- Five right-side callouts with dotted connector lines
+- Every milestone label and percentage is always visible
+- Center shows stage and overall on-time rate
+- Filter remains #023E8A
+- Waterfall value labels remain enabled

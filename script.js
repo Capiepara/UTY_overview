@@ -1,4 +1,4 @@
-const APP_VERSION = "v4.1.0";
+const APP_VERSION = "v4.1.2";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
 let workbook = null;
@@ -589,72 +589,130 @@ function drawHealth() {
   const stage = document.getElementById("healthStage").value;
   const { metrics, weightedRate } = milestoneMetrics(stage);
 
-  const angles = [90, 18, -54, -126, -198];
-  const labels = metrics.map(item => `${item.shortName}<br>${item.rate}%`);
+  const width = 760;
+  const height = 440;
+  const cx = 220;
+  const cy = 220;
+  const outerR = 150;
+  const innerR = 78;
 
-  Plotly.react(
-    "healthChart",
-    [{
-      type: "barpolar",
-      r: metrics.map(item => Math.max(item.rate, 5)),
-      theta: angles,
-      width: metrics.map(() => 58),
-      marker: {
-        color: metrics.map(item => scoreColor(item.rate)),
-        line: { color: "#ffffff", width: 5 }
-      },
-      customdata: metrics.map(item => [item.name, item.rate, item.eligible]),
-      hovertemplate:
-        "<b>%{customdata[0]}</b><br>" +
-        "On time: %{customdata[1]}%<br>" +
-        "DEV codes checked: %{customdata[2]}<extra></extra>"
-    }],
-    baseLayout({
-      margin: { l: 12, r: 12, t: 28, b: 12 },
-      polar: {
-        bgcolor: "rgba(0,0,0,0)",
-        radialaxis: {
-          visible: false,
-          range: [0, 110]
-        },
-        angularaxis: {
-          visible: false,
-          rotation: 90,
-          direction: "clockwise"
-        }
-      },
-      showlegend: false,
-      annotations: [
-        {
-          text:
-            `<b>${stage}</b><br>` +
-            `<span style="font-size:34px">${weightedRate}%</span><br>` +
-            `<span style="font-size:11px;color:#70808E">on time</span>`,
-          x: 0.5,
-          y: 0.5,
-          showarrow: false,
-          align: "center"
-        },
-        ...metrics.map((item, index) => {
-          const rad = angles[index] * Math.PI / 180;
-          const radius = 0.41;
-          return {
-            text: `<b>${item.shortName}</b><br>${item.rate}%`,
-            x: 0.5 + radius * Math.cos(rad),
-            y: 0.5 + radius * Math.sin(rad),
-            showarrow: false,
-            font: {
-              color: "#ffffff",
-              size: 11,
-              family: "Nunito, Tahoma, sans-serif"
-            },
-            align: "center"
-          };
-        })
-      ]
-    }),
-    plotConfig
-  );
+  const startAngle = -90;
+  const totalSweep = 180;
+  const gap = 3.5;
+  const segmentSweep = (totalSweep - gap * 4) / 5;
+
+  const calloutY = [55, 125, 205, 285, 365];
+  const calloutX = 470;
+
+  function pointOnCircle(radius, angleDeg) {
+    const radians = angleDeg * Math.PI / 180;
+    return {
+      x: cx + radius * Math.cos(radians),
+      y: cy + radius * Math.sin(radians)
+    };
+  }
+
+  function arcPath(innerRadius, outerRadius, angle1, angle2) {
+    const p1 = pointOnCircle(outerRadius, angle1);
+    const p2 = pointOnCircle(outerRadius, angle2);
+    const p3 = pointOnCircle(innerRadius, angle2);
+    const p4 = pointOnCircle(innerRadius, angle1);
+    const largeArc = Math.abs(angle2 - angle1) > 180 ? 1 : 0;
+
+    return [
+      `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
+      `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}`,
+      "Z"
+    ].join(" ");
+  }
+
+  const segmentSvg = metrics.map((item, index) => {
+    const a1 = startAngle + index * (segmentSweep + gap);
+    const a2 = a1 + segmentSweep;
+    const mid = (a1 + a2) / 2;
+
+    const path = arcPath(innerR, outerR, a1, a2);
+    const labelPoint = pointOnCircle((innerR + outerR) / 2, mid);
+    const connectorStart = pointOnCircle(outerR + 5, mid);
+    const elbowX = 400;
+    const targetY = calloutY[index];
+    const color = scoreColor(item.rate);
+
+    const shortLabel = item.shortName === "Material" ? "MATERIAL"
+      : item.shortName === "Pattern" ? "PATTERN"
+      : item.shortName === "Tooling" ? "TOOLING"
+      : item.shortName === "Mold" ? "MOLD"
+      : "CAD";
+
+    return `
+      <path class="health-segment"
+            d="${path}"
+            fill="${color}">
+        <title>${escapeHtml(item.name)} — ${item.rate}% on time — ${item.eligible} DEV codes checked</title>
+      </path>
+
+      <text class="health-segment-label"
+            x="${labelPoint.x.toFixed(1)}"
+            y="${(labelPoint.y - 3).toFixed(1)}">${shortLabel}</text>
+      <text class="health-segment-value"
+            x="${labelPoint.x.toFixed(1)}"
+            y="${(labelPoint.y + 14).toFixed(1)}">${item.rate}%</text>
+
+      <polyline class="health-connector"
+                points="${connectorStart.x.toFixed(1)},${connectorStart.y.toFixed(1)}
+                        ${elbowX},${connectorStart.y.toFixed(1)}
+                        ${elbowX + 18},${targetY}" />
+
+      <circle class="health-dot-outer" cx="${connectorStart.x.toFixed(1)}" cy="${connectorStart.y.toFixed(1)}" r="6"></circle>
+      <circle class="health-dot-inner" cx="${connectorStart.x.toFixed(1)}" cy="${connectorStart.y.toFixed(1)}" r="3"></circle>
+
+      <circle class="health-dot-outer" cx="${elbowX + 18}" cy="${targetY}" r="6"></circle>
+      <circle class="health-dot-inner" cx="${elbowX + 18}" cy="${targetY}" r="3"></circle>
+
+      <line class="health-callout-line"
+            x1="${calloutX}"
+            y1="${targetY + 17}"
+            x2="715"
+            y2="${targetY + 17}" />
+
+      <text class="health-callout-title" x="${calloutX}" y="${targetY}">
+        ${escapeHtml(item.name.toUpperCase())}
+      </text>
+      <text class="health-callout-value" x="${calloutX}" y="${targetY + 34}">
+        ${item.rate}% ON TIME
+      </text>
+      <text class="health-callout-desc" x="${calloutX}" y="${targetY + 51}">
+        ${item.eligible} DEV codes checked
+      </text>
+    `;
+  }).join("");
+
+  document.getElementById("healthChart").innerHTML = `
+    <div class="health-svg-wrap">
+      <svg class="health-svg"
+           viewBox="0 0 ${width} ${height}"
+           role="img"
+           aria-label="${escapeHtml(stage)} on-time infographic">
+
+        ${segmentSvg}
+
+        <circle class="health-center-disc" cx="${cx}" cy="${cy}" r="70"></circle>
+        <circle class="health-center-inner" cx="${cx}" cy="${cy}" r="52"></circle>
+
+        <text class="health-center-stage" x="${cx}" y="${cy - 25}">
+          ${escapeHtml(stage)}
+        </text>
+        <text class="health-center-value" x="${cx}" y="${cy + 6}">
+          ${weightedRate}%
+        </text>
+        <text class="health-center-caption" x="${cx}" y="${cy + 28}">
+          OVERALL ON TIME
+        </text>
+      </svg>
+    </div>
+  `;
 
   renderHealthSummary(metrics);
 }
