@@ -5,140 +5,161 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UTY Development Dashboard</title>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <link rel="stylesheet" href="style.css">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 </head>
 
 <body>
-  <div class="page">
-    <header class="header">
+  <main class="page-shell">
+    <header class="page-header">
       <div>
+        <p class="eyebrow">DEVELOPMENT ANALYTICS</p>
         <h1>UTY Development Dashboard</h1>
-        <p>Upload Excel file to analyze Development Tracking</p>
+        <p class="subtitle">Import the weekly Excel report and analyze the Development Tracking sheet.</p>
       </div>
+      <div id="loadBadge" class="status-badge">Waiting for file</div>
     </header>
 
-    <section class="card upload-card">
+    <section class="panel upload-panel">
       <div class="upload-grid">
-        <div>
-          <label>Excel File</label>
-          <input type="file" id="excelFile" accept=".xlsx,.xls" />
+        <div class="field">
+          <label for="excelFile">Excel file</label>
+          <input id="excelFile" type="file" accept=".xlsx,.xls" />
         </div>
 
-        <div>
-          <label>Worksheet</label>
-          <select id="sheetSelect">
-            <option>Please choose Excel file</option>
+        <div class="field">
+          <label for="sheetSelect">Worksheet</label>
+          <select id="sheetSelect" disabled>
+            <option>Select an Excel file first</option>
           </select>
         </div>
 
-        <button id="generateBtn" disabled>Generate Dashboard</button>
+        <button id="generateBtn" class="primary-btn" disabled>Generate dashboard</button>
       </div>
-
-      <p class="file-info">
-        Selected File: <span id="fileName">None</span>
-      </p>
+      <div class="file-line">
+        <span id="fileName">No file selected</span>
+        <span id="fileMeta"></span>
+      </div>
     </section>
 
     <section id="dashboard" class="dashboard hidden">
-      <section class="card">
-        <div class="section-title">
-          <h2>Filters</h2>
-          <button id="resetBtn">Reset</button>
+      <section class="panel filter-panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">FILTERS</p>
+            <h2>Analysis scope</h2>
+          </div>
+          <button id="resetBtn" class="ghost-btn">Reset all</button>
         </div>
 
         <div class="filter-grid">
-          <div>
-            <label>Season</label>
-            <select id="seasonFilter" multiple></select>
-          </div>
-
-          <div>
-            <label>Stage</label>
-            <select id="stageFilter" multiple></select>
-          </div>
-
-          <div>
-            <label>Factory</label>
-            <select id="factoryFilter" multiple></select>
-          </div>
-
-          <div>
-            <label>Material Indicator</label>
-            <select id="materialFilter" multiple></select>
-          </div>
+          <div class="field"><label>Season</label><select id="seasonFilter" multiple></select></div>
+          <div class="field"><label>Stage</label><select id="stageFilter" multiple></select></div>
+          <div class="field"><label>Factory</label><select id="factoryFilter" multiple></select></div>
+          <div class="field"><label>Material indicator</label><select id="materialFilter" multiple></select></div>
+          <div class="field model-filter"><label>Model</label><select id="modelFilter" multiple></select></div>
         </div>
       </section>
 
       <section class="kpi-grid">
-        <div class="kpi-card">
-          <p>Total DEV Code</p>
-          <h3 id="kpiDev">0</h3>
-        </div>
-
-        <div class="kpi-card">
-          <p>Shipment Ontime</p>
-          <h3 id="kpiOntime">0%</h3>
-        </div>
-
-        <div class="kpi-card">
-          <p>Dropped</p>
-          <h3 id="kpiDropped">0</h3>
-        </div>
-
-        <div class="kpi-card">
-          <p>CFM Total</p>
-          <h3 id="kpiCfm">0</h3>
-        </div>
+        <article class="kpi-card accent-cyan">
+          <span>Total DEV code</span>
+          <strong id="kpiDev">0</strong>
+          <small>Distinct DEV. Code</small>
+        </article>
+        <article class="kpi-card accent-orange">
+          <span>Overall milestone on-time</span>
+          <strong id="kpiHealth">0%</strong>
+          <small>Five plan-versus-actual gates</small>
+        </article>
+        <article class="kpi-card accent-coral">
+          <span>CFM / SMS active</span>
+          <strong id="kpiCfm">0</strong>
+          <small>SMS total minus SMS dropped</small>
+        </article>
+        <article class="kpi-card accent-navy">
+          <span>Models in scope</span>
+          <strong id="kpiModels">0</strong>
+          <small>Distinct Model</small>
+        </article>
       </section>
 
-      <section class="chart-grid">
-        <div class="card chart-card">
-          <h2>Stage Waterfall</h2>
-          <canvas id="waterfallChart"></canvas>
-        </div>
+      <section class="visual-grid top-row">
+        <article class="panel chart-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">PIPELINE</p>
+              <h2>Stage waterfall</h2>
+            </div>
+          </div>
+          <div id="waterfallChart" class="chart chart-large"></div>
+        </article>
 
-        <div class="card chart-card">
-          <h2>Shipment Ontime by Stage</h2>
-          <canvas id="ontimeChart"></canvas>
-        </div>
+        <article class="panel chart-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">MILESTONE HEALTH</p>
+              <h2>Plan versus actual</h2>
+            </div>
+            <select id="healthStage" class="stage-selector">
+              <option value="LR2">LR2</option>
+              <option value="FLC">FLC</option>
+              <option value="SMS">SMS</option>
+              <option value="CFM">CFM</option>
+            </select>
+          </div>
+          <div id="healthChart" class="chart chart-large"></div>
+          <p class="chart-note">
+            “No need”, “-”, “N/A”, existing, locked and arrived are treated as compliant.
+            Late dates remain completed but are scored as late.
+          </p>
+        </article>
       </section>
 
-      <section class="chart-grid">
-        <div class="card chart-card">
-          <h2>DEV Code by Season</h2>
-          <canvas id="seasonChart"></canvas>
-        </div>
+      <section class="visual-grid bottom-row">
+        <article class="panel chart-panel sankey-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">MATERIAL FLOW</p>
+              <h2>Stage → material indicator</h2>
+            </div>
+          </div>
+          <div id="sankeyChart" class="chart chart-xl"></div>
+        </article>
 
-        <div class="card chart-card">
-          <h2>DEV Code by Factory</h2>
-          <canvas id="factoryChart"></canvas>
-        </div>
+        <article class="panel chart-panel heatmap-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">MODEL MIX</p>
+              <h2>Model distribution by stage</h2>
+            </div>
+          </div>
+          <div id="heatmapChart" class="chart chart-xl"></div>
+          <p class="chart-note">Each row totals 100%; cells show the share of a model’s DEV codes by stage.</p>
+        </article>
       </section>
 
-      <section class="chart-grid">
-        <div class="card chart-card">
-          <h2>DEV Code by Stage</h2>
-          <canvas id="stageChart"></canvas>
+      <section class="panel detail-panel">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">DETAIL</p>
+            <h2>Filtered DEV codes</h2>
+          </div>
+          <input id="tableSearch" class="search-input" placeholder="Search DEV code, model, factory…" />
         </div>
-
-        <div class="card chart-card">
-          <h2>DEV Code by Material Indicator</h2>
-          <canvas id="materialChart"></canvas>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Detail Table</h2>
         <div class="table-wrap">
           <table id="detailTable"></table>
         </div>
       </section>
     </section>
-  </div>
+  </main>
 
   <script src="script.js"></script>
 </body>
