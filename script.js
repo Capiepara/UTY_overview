@@ -14,6 +14,7 @@ let headers = [];
 let choiceControls = {};
 let searchTerm = "";
 let k1Records = [];
+let k1FilteredRecords = [];
 
 const COLORS = {
   orange: "#F6A623",
@@ -97,6 +98,8 @@ document.querySelectorAll(".main-tab").forEach(button => {
 });
 
 document.getElementById("k1DetailFilter").addEventListener("change", renderK1DetailTable);
+document.getElementById("k1StatusFilter").addEventListener("change", updateK1Dashboard);
+document.getElementById("k1AttemptsFilter").addEventListener("change", updateK1Dashboard);
 
 function loadWorkbook(event) {
   const file = event.target.files?.[0];
@@ -1269,7 +1272,14 @@ function renderTable() {
 function normalizeK1Result(value) {
   const result = normalize(value);
 
-  if (!result || result === "-" || result === "n/a" || result === "no need") {
+  if (
+    !result ||
+    result === "-" ||
+    result === "n/a" ||
+    result === "na" ||
+    result === "no need" ||
+    result === "tbd"
+  ) {
     return "";
   }
 
@@ -1280,19 +1290,42 @@ function normalizeK1Result(value) {
   return text(value);
 }
 
-function k1FieldHasValue(value) {
+function isK1ExcludedValue(value) {
   const result = normalize(value);
-  return Boolean(result && result !== "-" && result !== "n/a" && result !== "no need");
+  return (
+    !result ||
+    result === "-" ||
+    result === "n/a" ||
+    result === "na" ||
+    result === "no need" ||
+    result === "tbd"
+  );
+}
+
+function k1FieldHasValue(value) {
+  return !isK1ExcludedValue(value);
+}
+
+function isActiveForK1(row) {
+  const status = normalize(getCol(row, ["Active/Drop"]));
+  return status === "active" || status.includes("active");
 }
 
 function buildK1Records() {
   const byDevCode = new Map();
 
   filteredData.forEach(row => {
+    // Dropped styles never enter the K1 Quality dashboard.
+    if (!isActiveForK1(row)) return;
+
     const devCode = text(getCol(row, ["DEV. Code"]));
     if (!devCode) return;
 
     const plan = getCol(row, ["K1 (Plan)"]);
+
+    // K1 is not required when Plan is blank, -, TBD, No need or N/A.
+    if (isK1ExcludedValue(plan)) return;
+
     const ship1 = getCol(row, ["K1 Ship (Actual)"]);
     const result1 = normalizeK1Result(getCol(row, ["K1 result"]));
 
@@ -1306,12 +1339,6 @@ function buildK1Records() {
       getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"])
     );
 
-    const hasActivity = [
-      plan, ship1, result1, ship2, result2, ship3, result3
-    ].some(k1FieldHasValue);
-
-    if (!hasActivity) return;
-
     let attempts = 0;
     if (k1FieldHasValue(ship1) || result1) attempts = 1;
     if (k1FieldHasValue(ship2) || result2) attempts = 2;
@@ -1321,6 +1348,13 @@ function buildK1Records() {
     if (result1 === "Pass") passRound = 1;
     else if (result2 === "Pass") passRound = 2;
     else if (result3 === "Pass") passRound = 3;
+
+    const hasAnyFail = [result1, result2, result3].includes("Fail");
+    const passAfterRefit = result1 === "Fail" && (result2 === "Pass" || result3 === "Pass");
+    const stillOpen = passRound === null;
+
+    // For planned but not yet submitted styles, attempts remain 0.
+    const effectiveAttempts = Math.max(attempts, passRound || 0);
 
     const record = {
       devCode,
@@ -1337,15 +1371,17 @@ function buildK1Records() {
       result2,
       ship3,
       result3,
-      attempts: Math.max(attempts, passRound || 0, 1),
+      attempts: effectiveAttempts,
       passRound,
-      firstFailed: result1 === "Fail",
-      stillOpen: !passRound
+      firstPass: passRound === 1,
+      needRefit: hasAnyFail,
+      passAfterRefit,
+      stillOpen
     };
 
     const previous = byDevCode.get(devCode);
 
-    // Keep the row containing the furthest K1 attempt.
+    // Keep the row containing the furthest available K1 round.
     if (!previous || record.attempts >= previous.attempts) {
       byDevCode.set(devCode, record);
     }
@@ -1356,25 +1392,53 @@ function buildK1Records() {
   );
 }
 
+function applyK1LocalFilters(records) {
+  const status = document.getElementById("k1StatusFilter").value;
+  const attempts = document.getElementById("k1AttemptsFilter").value;
+
+  return records.filter(item => {
+    const statusMatch =
+      status === "all" ||
+      (status === "first-pass" && item.firstPass) ||
+      (status === "need-refit" && item.needRefit) ||
+      (status === "pass-after-refit" && item.passAfterRefit) ||
+      (status === "still-open" && item.stillOpen);
+
+    const attemptsMatch =
+      attempts === "all" ||
+      item.attempts === Number(attempts);
+
+    return statusMatch && attemptsMatch;
+  });
+}
+
 function updateK1Dashboard() {
   k1Records = buildK1Records();
+  k1FilteredRecords = applyK1LocalFilters(k1Records);
 
-  const total = k1Records.length;
-  const firstPass = k1Records.filter(item => item.passRound === 1).length;
-  const needRefit = k1Records.filter(item => item.firstFailed).length;
-  const stillOpen = k1Records.filter(item => item.stillOpen).length;
-  const averageAttempts = total
-    ? k1Records.reduce((sum, item) => sum + item.attempts, 0) / total
+  const total = k1FilteredRecords.length;
+  const firstPass = k1FilteredRecords.filter(item => item.firstPass).length;
+  const needRefit = k1FilteredRecords.filter(item => item.needRefit).length;
+  const passAfterRefit = k1FilteredRecords.filter(item => item.passAfterRefit).length;
+  const stillOpen = k1FilteredRecords.filter(item => item.stillOpen).length;
+
+  const attempted = k1FilteredRecords.filter(item => item.attempts > 0);
+  const averageAttempts = attempted.length
+    ? attempted.reduce((sum, item) => sum + item.attempts, 0) / attempted.length
     : 0;
+
+  document.getElementById("k1Total").textContent = total;
 
   document.getElementById("k1FirstPass").textContent =
     total ? `${Math.round(firstPass / total * 100)}%` : "0%";
 
+  document.getElementById("k1NeedRefit").textContent =
+    total ? `${Math.round(needRefit / total * 100)}%` : "0%";
+
+  document.getElementById("k1PassAfterRefit").textContent = passAfterRefit;
+  document.getElementById("k1StillOpen").textContent = stillOpen;
   document.getElementById("k1AverageAttempts").textContent =
     averageAttempts.toFixed(1);
-
-  document.getElementById("k1NeedRefit").textContent = needRefit;
-  document.getElementById("k1StillOpen").textContent = stillOpen;
 
   drawK1Sankey();
   drawK1RetryChart();
@@ -1383,16 +1447,17 @@ function updateK1Dashboard() {
 }
 
 function drawK1Sankey() {
-  const count = predicate => k1Records.filter(predicate).length;
+  const records = k1FilteredRecords;
+  const count = predicate => records.filter(predicate).length;
 
   const pass1 = count(item => item.passRound === 1);
   const fail1 = count(item => item.result1 === "Fail");
-  const pending1 = count(item => !item.result1 || item.result1 === "Pending");
+  const waiting1 = count(item => !item.result1);
 
   const pass2 = count(item => item.passRound === 2);
   const fail2 = count(item => item.result1 === "Fail" && item.result2 === "Fail");
   const waiting2 = count(item =>
-    item.result1 === "Fail" && !item.result2 && !item.passRound
+    item.result1 === "Fail" && !item.result2 && item.passRound === null
   );
 
   const pass3 = count(item => item.passRound === 3);
@@ -1405,11 +1470,11 @@ function drawK1Sankey() {
     item.result1 === "Fail" &&
     item.result2 === "Fail" &&
     !item.result3 &&
-    !item.passRound
+    item.passRound === null
   );
 
   const labels = [
-    "K1 started",
+    "K1 required",
     "Pass round 1",
     "Fail round 1",
     "Waiting round 1",
@@ -1429,7 +1494,7 @@ function drawK1Sankey() {
 
   add(0, 1, pass1, hexToRgba(COLORS.teal, 0.56));
   add(0, 2, fail1, hexToRgba(COLORS.coral, 0.48));
-  add(0, 3, pending1, hexToRgba(COLORS.orange, 0.44));
+  add(0, 3, waiting1, hexToRgba(COLORS.orange, 0.44));
 
   add(2, 4, pass2, hexToRgba(COLORS.teal, 0.56));
   add(2, 5, fail2, hexToRgba(COLORS.coral, 0.48));
@@ -1480,25 +1545,27 @@ function drawK1Sankey() {
 }
 
 function drawK1RetryChart() {
+  const records = k1FilteredRecords;
+
   const data = [
     {
       label: "Pass round 1",
-      value: k1Records.filter(item => item.passRound === 1).length,
+      value: records.filter(item => item.passRound === 1).length,
       color: COLORS.teal
     },
     {
       label: "Pass round 2",
-      value: k1Records.filter(item => item.passRound === 2).length,
+      value: records.filter(item => item.passRound === 2).length,
       color: COLORS.cyan
     },
     {
       label: "Pass round 3",
-      value: k1Records.filter(item => item.passRound === 3).length,
+      value: records.filter(item => item.passRound === 3).length,
       color: COLORS.navy
     },
     {
       label: "Still open",
-      value: k1Records.filter(item => item.stillOpen).length,
+      value: records.filter(item => item.stillOpen).length,
       color: COLORS.coral
     }
   ].reverse();
@@ -1527,7 +1594,7 @@ function drawK1RetryChart() {
 function drawK1FactoryChart() {
   const factoryMap = new Map();
 
-  k1Records.forEach(item => {
+  k1FilteredRecords.forEach(item => {
     if (!item.factory) return;
     if (!factoryMap.has(item.factory)) factoryMap.set(item.factory, []);
     factoryMap.get(item.factory).push(item);
@@ -1536,14 +1603,12 @@ function drawK1FactoryChart() {
   const data = [...factoryMap.entries()]
     .map(([factory, records]) => ({
       factory,
-      firstPassRate: Math.round(
-        records.filter(item => item.passRound === 1).length /
-        records.length *
-        100
-      ),
-      averageAttempts:
-        records.reduce((sum, item) => sum + item.attempts, 0) /
-        records.length
+      firstPassRate: records.length
+        ? Math.round(records.filter(item => item.firstPass).length / records.length * 100)
+        : 0,
+      needRefitRate: records.length
+        ? Math.round(records.filter(item => item.needRefit).length / records.length * 100)
+        : 0
     }))
     .sort((a, b) => b.firstPassRate - a.firstPassRate);
 
@@ -1562,39 +1627,25 @@ function drawK1FactoryChart() {
           "%{x}<br>First-pass rate: <b>%{y}%</b><extra></extra>"
       },
       {
-        type: "scatter",
-        mode: "lines+markers",
+        type: "bar",
         x: data.map(item => item.factory),
-        y: data.map(item => Number(item.averageAttempts.toFixed(2))),
-        name: "Average attempts",
-        yaxis: "y2",
-        marker: { color: COLORS.coral, size: 8 },
-        line: { color: COLORS.coral, width: 2 },
+        y: data.map(item => item.needRefitRate),
+        name: "Need re-fit rate",
+        marker: { color: COLORS.coral },
+        text: data.map(item => `${item.needRefitRate}%`),
+        textposition: "outside",
         hovertemplate:
-          "%{x}<br>Average attempts: <b>%{y}</b><extra></extra>"
+          "%{x}<br>Need re-fit rate: <b>%{y}%</b><extra></extra>"
       }
     ],
     baseLayout({
-      margin: { l: 45, r: 50, t: 28, b: 60 },
+      margin: { l: 45, r: 25, t: 28, b: 60 },
+      barmode: "group",
       xaxis: { showgrid: false, tickangle: -25 },
       yaxis: {
-        title: "First-pass rate",
+        title: "Rate",
         range: [0, 110],
         ticksuffix: "%",
-        showgrid: false,
-        zeroline: false
-      },
-      yaxis2: {
-        title: "Attempts",
-        overlaying: "y",
-        side: "right",
-        range: [
-          0,
-          Math.max(
-            3.2,
-            ...data.map(item => item.averageAttempts + 0.5)
-          )
-        ],
         showgrid: false,
         zeroline: false
       },
@@ -1605,13 +1656,13 @@ function drawK1FactoryChart() {
 }
 
 function renderK1DetailTable() {
-  const filter = document.getElementById("k1DetailFilter").value;
+  const detailFilter = document.getElementById("k1DetailFilter").value;
 
-  const rows = k1Records.filter(item => {
-    if (filter === "pass1") return item.passRound === 1;
-    if (filter === "pass2") return item.passRound === 2;
-    if (filter === "pass3") return item.passRound === 3;
-    if (filter === "open") return item.stillOpen;
+  const rows = k1FilteredRecords.filter(item => {
+    if (detailFilter === "pass1") return item.passRound === 1;
+    if (detailFilter === "pass2") return item.passRound === 2;
+    if (detailFilter === "pass3") return item.passRound === 3;
+    if (detailFilter === "open") return item.stillOpen;
     return true;
   });
 
@@ -1625,6 +1676,7 @@ function renderK1DetailTable() {
         <th>Round 1</th>
         <th>Round 2</th>
         <th>Round 3</th>
+        <th>Need re-fit</th>
         <th>Latest status</th>
       </tr>
     </thead>
@@ -1632,7 +1684,9 @@ function renderK1DetailTable() {
       ${rows.map(item => {
         const statusText = item.passRound
           ? `Pass round ${item.passRound}`
-          : "Still open";
+          : item.attempts === 0
+            ? "Not submitted"
+            : "Still open";
 
         const statusClass = item.passRound
           ? "k1-pass"
@@ -1649,6 +1703,7 @@ function renderK1DetailTable() {
             <td>${escapeHtml(item.result1 || "-")}</td>
             <td>${escapeHtml(item.result2 || "-")}</td>
             <td>${escapeHtml(item.result3 || "-")}</td>
+            <td>${item.needRefit ? "Yes" : "No"}</td>
             <td class="${statusClass}">${statusText}</td>
           </tr>
         `;

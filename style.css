@@ -1263,3 +1263,34 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v4.3.0 — corrected K1 business logic and quality filters */
+.k1-filter-panel {
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+
+.k1-filter-grid {
+  display: grid;
+  grid-template-columns: 220px 180px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.k1-kpi-grid {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+@media (max-width: 1250px) {
+  .k1-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .k1-filter-grid,
+  .k1-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

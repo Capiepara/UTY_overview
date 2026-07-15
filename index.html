@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css?v=4.2.3">
+  <link rel="stylesheet" href="style.css?v=4.3.0">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -27,7 +27,7 @@
 
       <div class="header-status">
         <div id="loadBadge" class="status-badge">Waiting for file</div>
-        <div class="version-badge">Dashboard version <strong id="appVersion">v4.2.3</strong><br><span id="buildStamp">Build 2026-07-15 • CFM sample view</span></div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v4.3.0</strong><br><span id="buildStamp">Build 2026-07-15 • corrected K1 logic</span></div>
       </div>
     </header>
 
@@ -214,29 +214,73 @@
       </div>
 
       <div id="qualityPage" class="dashboard-page">
+        <section class="panel k1-filter-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">QUALITY FILTERS</p>
+              <h2>K1 status and attempts</h2>
+            </div>
+          </div>
+
+          <div class="k1-filter-grid">
+            <div class="field">
+              <label for="k1StatusFilter">K1 status</label>
+              <select id="k1StatusFilter">
+                <option value="all">All eligible K1</option>
+                <option value="first-pass">First pass</option>
+                <option value="need-refit">Need re-fit</option>
+                <option value="pass-after-refit">Pass after re-fit</option>
+                <option value="still-open">Still open</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="k1AttemptsFilter">Attempts</label>
+              <select id="k1AttemptsFilter">
+                <option value="all">All attempts</option>
+                <option value="1">1 attempt</option>
+                <option value="2">2 attempts</option>
+                <option value="3">3 attempts</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
         <section class="k1-kpi-grid">
+          <article class="kpi-card accent-navy">
+            <span>Total K1 styles</span>
+            <strong id="k1Total">0</strong>
+            <small>Active styles that require K1</small>
+          </article>
+
           <article class="kpi-card accent-teal">
             <span>First-pass rate</span>
             <strong id="k1FirstPass">0%</strong>
             <small>Passed at the first K1 result</small>
           </article>
 
-          <article class="kpi-card accent-cyan">
-            <span>Average attempts</span>
-            <strong id="k1AverageAttempts">0.0</strong>
-            <small>Average submitted K1 rounds</small>
+          <article class="kpi-card accent-orange">
+            <span>Need re-fit rate</span>
+            <strong id="k1NeedRefit">0%</strong>
+            <small>Had at least one Fail result</small>
           </article>
 
-          <article class="kpi-card accent-orange">
-            <span>Need re-fit</span>
-            <strong id="k1NeedRefit">0</strong>
-            <small>First K1 result was Fail</small>
+          <article class="kpi-card accent-cyan">
+            <span>Pass after re-fit</span>
+            <strong id="k1PassAfterRefit">0</strong>
+            <small>Failed first, then later passed</small>
           </article>
 
           <article class="kpi-card accent-coral">
             <span>Still open</span>
             <strong id="k1StillOpen">0</strong>
-            <small>No Pass recorded yet</small>
+            <small>No Pass result recorded yet</small>
+          </article>
+
+          <article class="kpi-card accent-navy">
+            <span>Average attempts</span>
+            <strong id="k1AverageAttempts">0.0</strong>
+            <small>Average submitted K1 rounds</small>
           </article>
         </section>
 
@@ -297,6 +341,6 @@
     </section>
   </main>
 
-  <script src="script.js?v=4.2.3"></script>
+  <script src="script.js?v=4.3.0"></script>
 </body>
 </html>
