@@ -1,4 +1,4 @@
-# UTY Development Dashboard v4.1.2
+# UTY Development Dashboard v4.1.3
 
 Replace these files in the GitHub Pages repository root:
 
@@ -6,11 +6,11 @@ Replace these files in the GitHub Pages repository root:
 - style.css
 - script.js
 
-Fixes:
-- On-time check rebuilt as an SVG infographic
-- Five left-side radial sectors, matching the supplied reference layout
-- Five right-side callouts with dotted connector lines
-- Every milestone label and percentage is always visible
-- Center shows stage and overall on-time rate
+Changes:
+- On-time infographic wings enlarged substantially
+- Ring thickness increased
+- Gaps between wings reduced
+- Center circle and percentage enlarged
+- Labels and connector positions adjusted
 - Filter remains #023E8A
 - Waterfall value labels remain enabled

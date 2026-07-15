@@ -1,4 +1,4 @@
-const APP_VERSION = "v4.1.2";
+const APP_VERSION = "v4.1.3";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
 let workbook = null;
@@ -589,20 +589,20 @@ function drawHealth() {
   const stage = document.getElementById("healthStage").value;
   const { metrics, weightedRate } = milestoneMetrics(stage);
 
-  const width = 760;
-  const height = 440;
-  const cx = 220;
-  const cy = 220;
-  const outerR = 150;
-  const innerR = 78;
+  const width = 820;
+  const height = 500;
+  const cx = 245;
+  const cy = 250;
+  const outerR = 190;
+  const innerR = 62;
 
   const startAngle = -90;
   const totalSweep = 180;
-  const gap = 3.5;
+  const gap = 2;
   const segmentSweep = (totalSweep - gap * 4) / 5;
 
-  const calloutY = [55, 125, 205, 285, 365];
-  const calloutX = 470;
+  const calloutY = [55, 145, 240, 335, 425];
+  const calloutX = 525;
 
   function pointOnCircle(radius, angleDeg) {
     const radians = angleDeg * Math.PI / 180;
@@ -636,7 +636,7 @@ function drawHealth() {
     const path = arcPath(innerR, outerR, a1, a2);
     const labelPoint = pointOnCircle((innerR + outerR) / 2, mid);
     const connectorStart = pointOnCircle(outerR + 5, mid);
-    const elbowX = 400;
+    const elbowX = 455;
     const targetY = calloutY[index];
     const color = scoreColor(item.rate);
 
@@ -674,7 +674,7 @@ function drawHealth() {
       <line class="health-callout-line"
             x1="${calloutX}"
             y1="${targetY + 17}"
-            x2="715"
+            x2="785"
             y2="${targetY + 17}" />
 
       <text class="health-callout-title" x="${calloutX}" y="${targetY}">
@@ -698,16 +698,16 @@ function drawHealth() {
 
         ${segmentSvg}
 
-        <circle class="health-center-disc" cx="${cx}" cy="${cy}" r="70"></circle>
-        <circle class="health-center-inner" cx="${cx}" cy="${cy}" r="52"></circle>
+        <circle class="health-center-disc" cx="${cx}" cy="${cy}" r="84"></circle>
+        <circle class="health-center-inner" cx="${cx}" cy="${cy}" r="63"></circle>
 
-        <text class="health-center-stage" x="${cx}" y="${cy - 25}">
+        <text class="health-center-stage" x="${cx}" y="${cy - 31}">
           ${escapeHtml(stage)}
         </text>
-        <text class="health-center-value" x="${cx}" y="${cy + 6}">
+        <text class="health-center-value" x="${cx}" y="${cy + 10}">
           ${weightedRate}%
         </text>
-        <text class="health-center-caption" x="${cx}" y="${cy + 28}">
+        <text class="health-center-caption" x="${cx}" y="${cy + 37}">
           OVERALL ON TIME
         </text>
       </svg>
