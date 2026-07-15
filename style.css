@@ -1131,3 +1131,135 @@ tbody tr:hover {
     width: 100%;
   }
 }
+
+
+/* v4.2.2 — dedicated CFM sample shipment view */
+.cfm-health-view {
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
+  gap: 22px;
+  align-items: center;
+  min-height: 420px;
+  padding: 24px 18px 14px;
+}
+
+.cfm-gauge {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  justify-self: center;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      var(--cfm-color) 0deg var(--cfm-angle),
+      #e9eef2 var(--cfm-angle) 360deg
+    );
+  box-shadow: 0 10px 25px rgba(38, 55, 70, 0.10);
+}
+
+.cfm-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 10px solid #f1f4f6;
+}
+
+.cfm-gauge-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  z-index: 2;
+}
+
+.cfm-gauge-center strong {
+  display: block;
+  color: var(--ink);
+  font-size: 44px;
+  line-height: 1;
+}
+
+.cfm-gauge-center span {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.cfm-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.cfm-summary-card {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 13px;
+  border-left: 5px solid var(--navy);
+  background: #f7f8f9;
+}
+
+.cfm-summary-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cfm-summary-card strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.cfm-status-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cfm-status-box {
+  padding: 11px;
+  text-align: center;
+  background: #f7f8f9;
+  border-top: 4px solid var(--navy);
+}
+
+.cfm-status-box strong {
+  display: block;
+  font-size: 22px;
+}
+
+.cfm-status-box span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cfm-empty {
+  display: grid;
+  place-content: center;
+  min-height: 390px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 850px) {
+  .cfm-health-view {
+    grid-template-columns: 1fr;
+  }
+
+  .cfm-summary-card {
+    grid-template-columns: 1fr;
+  }
+}

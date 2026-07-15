@@ -1,4 +1,4 @@
-const APP_VERSION = "v4.2.1";
+const APP_VERSION = "v4.2.2";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
 let workbook = null;
@@ -612,6 +612,15 @@ function scoreColor(rate) {
 
 function drawHealth() {
   const stage = document.getElementById("healthStage").value;
+
+  if (stage === "CFM") {
+    drawCFMHealth();
+    return;
+  }
+
+  document.getElementById("healthTitle").textContent = "Plan compared with actual";
+  document.getElementById("healthSummary").style.display = "";
+
   const { metrics, weightedRate } = milestoneMetrics(stage);
 
   const width = 820;
@@ -740,6 +749,196 @@ function drawHealth() {
   `;
 
   renderHealthSummary(metrics);
+}
+
+function getCFMOutcome(row) {
+  const planRaw = getCol(row, ["CFM SMPL ETD (Plan)"]);
+  const actualRaw = getCol(row, ["CFM SMPL Sent (Actual)"]);
+
+  const planStatus = semanticStatus(planRaw);
+  const actualStatus = semanticStatus(actualRaw);
+
+  if (planStatus === "exempt" || actualStatus === "exempt") {
+    return {
+      score: 1,
+      status: "on-time",
+      delayDays: 0,
+      planDate: null,
+      actualDate: null
+    };
+  }
+
+  const planDate = parseExcelDate(planRaw);
+  const actualDate = parseExcelDate(actualRaw);
+
+  if (planDate && actualDate) {
+    const delayDays = Math.ceil((actualDate - planDate) / 86400000);
+
+    return {
+      score: delayDays <= 0 ? 1 : 0,
+      status: delayDays <= 0 ? "on-time" : "late",
+      delayDays: Math.max(delayDays, 0),
+      planDate,
+      actualDate
+    };
+  }
+
+  if (planDate && !actualDate) {
+    const overdueDays = Math.ceil((Date.now() - planDate.getTime()) / 86400000);
+
+    return {
+      score: overdueDays > 0 ? 0 : null,
+      status: overdueDays > 0 ? "overdue" : "pending",
+      delayDays: Math.max(overdueDays, 0),
+      planDate,
+      actualDate: null
+    };
+  }
+
+  if (!planDate && actualDate) {
+    return {
+      score: 1,
+      status: "on-time",
+      delayDays: 0,
+      planDate: null,
+      actualDate
+    };
+  }
+
+  return {
+    score: null,
+    status: "pending",
+    delayDays: null,
+    planDate: null,
+    actualDate: null
+  };
+}
+
+function drawCFMHealth() {
+  document.getElementById("healthTitle").textContent =
+    "CFM sample shipment performance";
+  document.getElementById("healthSummary").style.display = "none";
+
+  const rows = stageRows("CFM");
+  const outcomesByDev = new Map();
+
+  rows.forEach(row => {
+    const devCode = text(getCol(row, ["DEV. Code"]));
+    if (!devCode) return;
+
+    const outcome = getCFMOutcome(row);
+    const previous = outcomesByDev.get(devCode);
+
+    // Keep the most critical outcome when duplicated.
+    if (
+      !previous ||
+      outcome.score === 0 ||
+      (previous.score === null && outcome.score !== null)
+    ) {
+      outcomesByDev.set(devCode, outcome);
+    }
+  });
+
+  const outcomes = [...outcomesByDev.values()];
+  const eligible = outcomes.filter(item => item.score !== null);
+  const onTime = eligible.filter(item => item.score === 1).length;
+  const late = eligible.filter(item => item.score === 0).length;
+  const pending = outcomes.filter(item => item.score === null).length;
+
+  const rate = eligible.length
+    ? Math.round(onTime / eligible.length * 100)
+    : 0;
+
+  const lateDays = eligible
+    .filter(item => item.score === 0 && Number.isFinite(item.delayDays))
+    .map(item => item.delayDays);
+
+  const averageDelay = lateDays.length
+    ? Math.round(
+        lateDays.reduce((sum, value) => sum + value, 0) /
+        lateDays.length
+      )
+    : 0;
+
+  const planDates = outcomes
+    .map(item => item.planDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+
+  const actualDates = outcomes
+    .map(item => item.actualDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+
+  const middleDate = dates => {
+    if (!dates.length) return null;
+    return dates[Math.floor(dates.length / 2)];
+  };
+
+  const medianPlan = middleDate(planDates);
+  const medianActual = middleDate(actualDates);
+
+  const color = scoreColor(rate);
+  const angle = Math.max(0, Math.min(rate, 100)) * 3.6;
+
+  if (!outcomes.length) {
+    document.getElementById("healthChart").innerHTML = `
+      <div class="cfm-empty">
+        <strong>No CFM sample data is available</strong>
+        <span>Expected columns: CFM SMPL ETD (Plan) and CFM SMPL Sent (Actual)</span>
+      </div>
+    `;
+    return;
+  }
+
+  document.getElementById("healthChart").innerHTML = `
+    <div class="cfm-health-view">
+      <div class="cfm-gauge"
+           style="--cfm-color:${color};--cfm-angle:${angle}deg">
+        <div class="cfm-gauge-center">
+          <strong>${rate}%</strong>
+          <span>CFM sample on time</span>
+        </div>
+      </div>
+
+      <div class="cfm-summary">
+        <div class="cfm-summary-card" style="border-left-color:${COLORS.navy}">
+          <span>DEV codes checked</span>
+          <strong>${outcomes.length}</strong>
+        </div>
+
+        <div class="cfm-summary-card" style="border-left-color:${COLORS.cyan}">
+          <span>Median planned ETD</span>
+          <strong>${medianPlan ? medianPlan.toLocaleDateString("en-GB") : "—"}</strong>
+        </div>
+
+        <div class="cfm-summary-card" style="border-left-color:${COLORS.teal}">
+          <span>Median actual sent</span>
+          <strong>${medianActual ? medianActual.toLocaleDateString("en-GB") : "—"}</strong>
+        </div>
+
+        <div class="cfm-summary-card" style="border-left-color:${COLORS.coral}">
+          <span>Average late days</span>
+          <strong>${averageDelay} days</strong>
+        </div>
+
+        <div class="cfm-status-row">
+          <div class="cfm-status-box" style="border-top-color:${COLORS.teal}">
+            <strong>${onTime}</strong>
+            <span>On time</span>
+          </div>
+          <div class="cfm-status-box" style="border-top-color:${COLORS.coral}">
+            <strong>${late}</strong>
+            <span>Late</span>
+          </div>
+          <div class="cfm-status-box" style="border-top-color:${COLORS.orange}">
+            <strong>${pending}</strong>
+            <span>Pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderHealthSummary(metrics) {
