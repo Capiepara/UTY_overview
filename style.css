@@ -1012,3 +1012,113 @@ tbody tr:hover {
     min-height: 610px;
   }
 }
+
+
+/* v4.2.0 — dashboard tabs and K1 quality module */
+.dashboard-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 13px 0;
+  padding: 4px;
+  background: #e7e4e0;
+  border: 1px solid var(--line);
+}
+
+.dashboard-tab {
+  width: auto;
+  min-height: 38px;
+  padding: 0 22px;
+  border: 0;
+  background: transparent;
+  color: #596773;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.dashboard-tab.active {
+  background: #ffffff;
+  color: #023E8A;
+  box-shadow: 0 2px 8px rgba(38, 55, 70, 0.08);
+}
+
+.dashboard-view {
+  display: none;
+}
+
+.dashboard-view.active-view {
+  display: block;
+}
+
+.k1-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13px;
+  margin-bottom: 13px;
+}
+
+.k1-top-row {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.k1-bottom-row {
+  grid-template-columns: 0.8fr 1.2fr;
+}
+
+.k1-detail-panel {
+  padding: 17px;
+  min-width: 0;
+}
+
+.k1-detail-filter {
+  width: 190px;
+  min-height: 37px;
+}
+
+.k1-detail-wrap {
+  max-height: 470px;
+}
+
+.k1-status-pass {
+  color: #287967;
+  font-weight: 800;
+}
+
+.k1-status-fail {
+  color: #b72f35;
+  font-weight: 800;
+}
+
+.k1-status-open {
+  color: #b07400;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .k1-kpi-grid,
+  .k1-top-row,
+  .k1-bottom-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-tab {
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  .k1-kpi-grid,
+  .k1-top-row,
+  .k1-bottom-row {
+    grid-template-columns: 1fr;
+  }
+
+  .k1-detail-filter {
+    width: 100%;
+  }
+}

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css?v=4.1.3">
+  <link rel="stylesheet" href="style.css?v=4.2.0">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -27,7 +27,7 @@
 
       <div class="header-status">
         <div id="loadBadge" class="status-badge">Waiting for file</div>
-        <div class="version-badge">Dashboard version <strong id="appVersion">v4.1.3</strong><br><span id="buildStamp">Build 2026-07-14 • larger wings</span></div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v4.2.0</strong><br><span id="buildStamp">Build 2026-07-15 • K1 quality</span></div>
       </div>
     </header>
 
@@ -73,6 +73,12 @@
         </div>
       </section>
 
+      <nav class="dashboard-tabs" aria-label="Dashboard sections">
+        <button class="dashboard-tab active" data-tab="developmentView">Development</button>
+        <button class="dashboard-tab" data-tab="qualityView">Quality (K1)</button>
+      </nav>
+
+      <section id="developmentView" class="dashboard-view active-view">
       <section class="kpi-grid">
         <article class="kpi-card accent-cyan">
           <span>Total DEV codes</span>
@@ -205,9 +211,92 @@
           <table id="detailTable"></table>
         </div>
       </section>
+      </section>
+
+      <section id="qualityView" class="dashboard-view">
+        <section class="k1-kpi-grid">
+          <article class="kpi-card accent-teal">
+            <span>First-pass rate</span>
+            <strong id="k1FirstPass">0%</strong>
+            <small>Passed on the first K1 result</small>
+          </article>
+
+          <article class="kpi-card accent-cyan">
+            <span>Average attempts</span>
+            <strong id="k1AverageAttempts">0</strong>
+            <small>Average K1 rounds for started DEV codes</small>
+          </article>
+
+          <article class="kpi-card accent-orange">
+            <span>Need re-fit</span>
+            <strong id="k1NeedRefit">0</strong>
+            <small>First K1 result was Fail</small>
+          </article>
+
+          <article class="kpi-card accent-coral">
+            <span>Still open</span>
+            <strong id="k1StillOpen">0</strong>
+            <small>No Pass result recorded yet</small>
+          </article>
+        </section>
+
+        <section class="visual-grid k1-top-row">
+          <article class="panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">K1 RESULT FLOW</p>
+                <h2>K1 attempts until Pass</h2>
+              </div>
+            </div>
+            <div id="k1SankeyChart" class="chart chart-xl"></div>
+          </article>
+
+          <article class="panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">ATTEMPT SUMMARY</p>
+                <h2>Pass round distribution</h2>
+              </div>
+            </div>
+            <div id="k1RetryChart" class="chart chart-xl"></div>
+          </article>
+        </section>
+
+        <section class="visual-grid k1-bottom-row">
+          <article class="panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">FACTORY VIEW</p>
+                <h2>K1 performance by factory</h2>
+              </div>
+            </div>
+            <div id="k1FactoryChart" class="chart chart-medium"></div>
+          </article>
+
+          <article class="panel k1-detail-panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">K1 DETAILS</p>
+                <h2>DEV codes by result</h2>
+              </div>
+              <select id="k1DetailFilter" class="k1-detail-filter">
+                <option value="all">All started</option>
+                <option value="pass1">Passed first round</option>
+                <option value="pass2">Passed second round</option>
+                <option value="pass3">Passed third round</option>
+                <option value="open">Still open</option>
+              </select>
+            </div>
+
+            <div class="table-wrap k1-detail-wrap">
+              <table id="k1DetailTable"></table>
+            </div>
+          </article>
+        </section>
+      </section>
     </section>
   </main>
 
-  <script src="script.js?v=4.1.3"></script>
+  <script src="script.js?v=4.2.0"></script>
 </body>
 </html>
