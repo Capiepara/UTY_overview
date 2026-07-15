@@ -1323,3 +1323,15 @@ tbody tr:hover {
     position: static;
   }
 }
+
+
+/* v4.3.2 — tabs sit below the shared global filter */
+.main-tabs {
+  top: 126px;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.filter-panel {
+  margin-bottom: 0;
+}

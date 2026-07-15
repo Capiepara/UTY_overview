@@ -1290,16 +1290,23 @@ function normalizeK1Result(value) {
   return text(value);
 }
 
-function isK1ExcludedValue(value) {
+function isK1NoNeedMarker(value) {
   const result = normalize(value);
   return (
-    !result ||
     result === "-" ||
     result === "n/a" ||
     result === "na" ||
     result === "no need" ||
     result === "tbd"
   );
+}
+
+function isK1Blank(value) {
+  return value === null || value === undefined || String(value).trim() === "";
+}
+
+function isK1ExcludedValue(value) {
+  return isK1Blank(value) || isK1NoNeedMarker(value);
 }
 
 function k1FieldHasValue(value) {
@@ -1325,18 +1332,36 @@ function getK1CurrentStatus({
   if (passRound === 3) return "Pass round 3";
 
   if (result1 === "Fail") {
-    if (!k1FieldHasValue(ship2) && !result2) return "Waiting re-fit shipment round 2";
-    if (k1FieldHasValue(ship2) && !result2) return "Result pending round 2";
+    if (isK1Blank(ship2) && isK1Blank(result2)) {
+      return "Waiting re-fit shipment round 2";
+    }
+
+    if (!isK1Blank(ship2) && isK1Blank(result2)) {
+      return "Result pending round 2";
+    }
 
     if (result2 === "Fail") {
-      if (!k1FieldHasValue(ship3) && !result3) return "Waiting re-fit shipment round 3";
-      if (k1FieldHasValue(ship3) && !result3) return "Result pending round 3";
-      if (result3 === "Fail") return "Still fail after round 3";
+      if (isK1Blank(ship3) && isK1Blank(result3)) {
+        return "Waiting re-fit shipment round 3";
+      }
+
+      if (!isK1Blank(ship3) && isK1Blank(result3)) {
+        return "Result pending round 3";
+      }
+
+      if (result3 === "Fail") {
+        return "Still fail after round 3";
+      }
     }
   }
 
-  if (!k1FieldHasValue(ship1) && !result1) return "Waiting shipment round 1";
-  if (k1FieldHasValue(ship1) && !result1) return "Result pending round 1";
+  if (isK1Blank(ship1) && isK1Blank(result1)) {
+    return "Waiting shipment round 1";
+  }
+
+  if (!isK1Blank(ship1) && isK1Blank(result1)) {
+    return "Result pending round 1";
+  }
 
   return "Still open";
 }
@@ -1352,39 +1377,75 @@ function buildK1Records() {
     if (!devCode) return;
 
     const plan = getCol(row, ["K1 (Plan)"]);
+    const result1Raw = getCol(row, ["K1 result"]);
 
-    // K1 is not required when Plan is blank, -, TBD, No need or N/A.
+    // A blank Plan means no scheduled K1 record.
+    // Explicit -, TBD, No need or N/A in Plan means K1 is not required.
     if (isK1ExcludedValue(plan)) return;
 
+    // Business rule confirmed from raw:
+    // Explicit -, TBD, No need or N/A in Round 1 Result means this style
+    // does not require K1 and must be excluded from every Quality KPI/chart.
+    // Only a truly blank Result is considered waiting/pending.
+    if (isK1NoNeedMarker(result1Raw)) return;
+
     const ship1 = getCol(row, ["K1 Ship (Actual)"]);
-    const result1 = normalizeK1Result(getCol(row, ["K1 result"]));
+    const result1 = normalizeK1Result(result1Raw);
 
     const ship2 = getCol(row, ["K1 re-fit Ship"]);
-    const result2 = normalizeK1Result(
-      getCol(row, ["K1 resut (2nd)", "K1 result (2nd)"])
-    );
+    const result2Raw = getCol(row, ["K1 resut (2nd)", "K1 result (2nd)"]);
+    const result2 = normalizeK1Result(result2Raw);
 
     const ship3 = getCol(row, ["K1 re-fit Ship2"]);
-    const result3 = normalizeK1Result(
-      getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"])
-    );
+    const result3Raw = getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"]);
+    const result3 = normalizeK1Result(result3Raw);
 
     let attempts = 0;
     if (k1FieldHasValue(ship1) || result1) attempts = 1;
-    if (k1FieldHasValue(ship2) || result2) attempts = 2;
-    if (k1FieldHasValue(ship3) || result3) attempts = 3;
+
+    // Round 2 only exists after Round 1 Fail.
+    if (
+      result1 === "Fail" &&
+      (k1FieldHasValue(ship2) || result2)
+    ) {
+      attempts = 2;
+    }
+
+    // Round 3 only exists after Round 1 and Round 2 both Fail.
+    if (
+      result1 === "Fail" &&
+      result2 === "Fail" &&
+      (k1FieldHasValue(ship3) || result3)
+    ) {
+      attempts = 3;
+    }
 
     let passRound = null;
-    if (result1 === "Pass") passRound = 1;
-    else if (result2 === "Pass") passRound = 2;
-    else if (result3 === "Pass") passRound = 3;
+    if (result1 === "Pass") {
+      passRound = 1;
+    } else if (result1 === "Fail" && result2 === "Pass") {
+      passRound = 2;
+    } else if (
+      result1 === "Fail" &&
+      result2 === "Fail" &&
+      result3 === "Pass"
+    ) {
+      passRound = 3;
+    }
 
-    const hasAnyFail = [result1, result2, result3].includes("Fail");
-    const passAfterRefit = result1 === "Fail" && (result2 === "Pass" || result3 === "Pass");
+    const hasAnyFail =
+      result1 === "Fail" ||
+      (result1 === "Fail" && result2 === "Fail") ||
+      (
+        result1 === "Fail" &&
+        result2 === "Fail" &&
+        result3 === "Fail"
+      );
+
+    const passAfterRefit =
+      passRound === 2 || passRound === 3;
+
     const stillOpen = passRound === null;
-
-    // For planned but not yet submitted styles, attempts remain 0.
-    const effectiveAttempts = Math.max(attempts, passRound || 0);
 
     const record = {
       devCode,
@@ -1401,7 +1462,7 @@ function buildK1Records() {
       result2,
       ship3,
       result3,
-      attempts: effectiveAttempts,
+      attempts,
       passRound,
       firstPass: passRound === 1,
       needRefit: hasAnyFail,
@@ -1420,7 +1481,7 @@ function buildK1Records() {
 
     const previous = byDevCode.get(devCode);
 
-    // Keep the row containing the furthest available K1 round.
+    // Keep the row containing the furthest valid K1 round.
     if (!previous || record.attempts >= previous.attempts) {
       byDevCode.set(devCode, record);
     }
@@ -1492,10 +1553,10 @@ function drawK1Sankey() {
   const pass1 = count(item => item.passRound === 1);
   const fail1 = count(item => item.result1 === "Fail");
   const waitingShipment1 = count(item =>
-    !k1FieldHasValue(item.ship1) && !item.result1
+    isK1Blank(item.ship1) && isK1Blank(item.result1)
   );
   const pendingResult1 = count(item =>
-    k1FieldHasValue(item.ship1) && !item.result1
+    !isK1Blank(item.ship1) && isK1Blank(item.result1)
   );
 
   const pass2 = count(item => item.passRound === 2);
@@ -1504,13 +1565,13 @@ function drawK1Sankey() {
   );
   const waitingShipment2 = count(item =>
     item.result1 === "Fail" &&
-    !k1FieldHasValue(item.ship2) &&
-    !item.result2
+    isK1Blank(item.ship2) &&
+    isK1Blank(item.result2)
   );
   const pendingResult2 = count(item =>
     item.result1 === "Fail" &&
-    k1FieldHasValue(item.ship2) &&
-    !item.result2
+    !isK1Blank(item.ship2) &&
+    isK1Blank(item.result2)
   );
 
   const pass3 = count(item => item.passRound === 3);
@@ -1522,14 +1583,14 @@ function drawK1Sankey() {
   const waitingShipment3 = count(item =>
     item.result1 === "Fail" &&
     item.result2 === "Fail" &&
-    !k1FieldHasValue(item.ship3) &&
-    !item.result3
+    isK1Blank(item.ship3) &&
+    isK1Blank(item.result3)
   );
   const pendingResult3 = count(item =>
     item.result1 === "Fail" &&
     item.result2 === "Fail" &&
-    k1FieldHasValue(item.ship3) &&
-    !item.result3
+    !isK1Blank(item.ship3) &&
+    isK1Blank(item.result3)
   );
 
   const labels = [

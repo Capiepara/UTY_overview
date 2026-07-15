@@ -1,21 +1,23 @@
-# UTY Development Dashboard v4.3.1
+# UTY Development Dashboard v4.3.2
 
-Updates:
-- Global Season / Stage / Factory / Material / Model filters are outside the tab pages.
-- Global filters remain visible and keep their selections when switching tabs.
-- K1 Sankey now separates:
-  - Waiting shipment
-  - Result pending
-  - Pass
-  - Fail / re-fit
-- A shipped K1 with result "-" is Result Pending, not Waiting Shipment.
-- Plan values blank, -, TBD, No need, N/A remain excluded.
+K1 logic correction:
+
 - Only Active records are included.
-- K1 detail table now shows the precise current state.
+- Dropped records are excluded.
+- K1 Plan blank, -, TBD, No need, N/A are excluded.
+- Explicit -, TBD, No need or N/A in K1 Round 1 Result means K1 is not required and is excluded.
+- Only a truly blank Result cell is Waiting / Result Pending.
+- Round 2 is evaluated only after Round 1 Fail.
+- Round 3 is evaluated only after Round 1 and Round 2 both Fail.
+- Pass stops the later-round evaluation.
+- Global filters now appear above the Development / Quality tabs.
 
-Raw validation for SS27 / SMS / Active:
-- 22 eligible K1 styles
+Raw file validation for SS27 + SMS + Active:
+- 23 Active raw rows
+- 1 row excluded because K1 Plan = "-"
+- 11 K1-required rows with real Pass/Fail results
 - 6 Pass round 1
-- 5 Fail round 1
-- 3 Result pending round 1
-- 8 Waiting shipment round 1
+- 5 Fail round 1 then Pass round 2
+- 0 Waiting
+- 0 Result pending
+- 0 Still open
