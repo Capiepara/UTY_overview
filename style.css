@@ -1294,3 +1294,32 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v4.3.1 — global filter remains visible across Development and Quality tabs */
+.filter-panel {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 22px rgba(2, 62, 138, 0.15);
+}
+
+.main-tabs {
+  position: sticky;
+  top: 126px;
+  z-index: 35;
+}
+
+@media (max-width: 1180px) {
+  .main-tabs {
+    top: 184px;
+  }
+}
+
+@media (max-width: 720px) {
+  .filter-panel,
+  .main-tabs {
+    position: static;
+  }
+}

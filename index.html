@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-  <link rel="stylesheet" href="style.css?v=4.3.0">
+  <link rel="stylesheet" href="style.css?v=4.3.1">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -27,7 +27,7 @@
 
       <div class="header-status">
         <div id="loadBadge" class="status-badge">Waiting for file</div>
-        <div class="version-badge">Dashboard version <strong id="appVersion">v4.3.0</strong><br><span id="buildStamp">Build 2026-07-15 • corrected K1 logic</span></div>
+        <div class="version-badge">Dashboard version <strong id="appVersion">v4.3.1</strong><br><span id="buildStamp">Build 2026-07-15 • K1 waiting/pending fix</span></div>
       </div>
     </header>
 
@@ -60,7 +60,7 @@
     </nav>
 
     <section id="dashboard" class="dashboard hidden">
-      <div id="developmentPage" class="dashboard-page active-page">
+
       <section class="panel filter-panel">
         <div class="section-head">
           <div>
@@ -79,7 +79,8 @@
         </div>
       </section>
 
-      <section class="kpi-grid">
+      <div id="developmentPage" class="dashboard-page active-page">
+<section class="kpi-grid">
         <article class="kpi-card accent-cyan">
           <span>Total DEV codes</span>
           <strong id="kpiDev">0</strong>
@@ -341,6 +342,6 @@
     </section>
   </main>
 
-  <script src="script.js?v=4.3.0"></script>
+  <script src="script.js?v=4.3.1"></script>
 </body>
 </html>

@@ -1311,6 +1311,36 @@ function isActiveForK1(row) {
   return status === "active" || status.includes("active");
 }
 
+function getK1CurrentStatus({
+  result1,
+  result2,
+  result3,
+  ship1,
+  ship2,
+  ship3,
+  passRound
+}) {
+  if (passRound === 1) return "Pass round 1";
+  if (passRound === 2) return "Pass round 2";
+  if (passRound === 3) return "Pass round 3";
+
+  if (result1 === "Fail") {
+    if (!k1FieldHasValue(ship2) && !result2) return "Waiting re-fit shipment round 2";
+    if (k1FieldHasValue(ship2) && !result2) return "Result pending round 2";
+
+    if (result2 === "Fail") {
+      if (!k1FieldHasValue(ship3) && !result3) return "Waiting re-fit shipment round 3";
+      if (k1FieldHasValue(ship3) && !result3) return "Result pending round 3";
+      if (result3 === "Fail") return "Still fail after round 3";
+    }
+  }
+
+  if (!k1FieldHasValue(ship1) && !result1) return "Waiting shipment round 1";
+  if (k1FieldHasValue(ship1) && !result1) return "Result pending round 1";
+
+  return "Still open";
+}
+
 function buildK1Records() {
   const byDevCode = new Map();
 
@@ -1376,7 +1406,16 @@ function buildK1Records() {
       firstPass: passRound === 1,
       needRefit: hasAnyFail,
       passAfterRefit,
-      stillOpen
+      stillOpen,
+      currentStatus: getK1CurrentStatus({
+        result1,
+        result2,
+        result3,
+        ship1,
+        ship2,
+        ship3,
+        passRound
+      })
     };
 
     const previous = byDevCode.get(devCode);
@@ -1452,12 +1491,26 @@ function drawK1Sankey() {
 
   const pass1 = count(item => item.passRound === 1);
   const fail1 = count(item => item.result1 === "Fail");
-  const waiting1 = count(item => !item.result1);
+  const waitingShipment1 = count(item =>
+    !k1FieldHasValue(item.ship1) && !item.result1
+  );
+  const pendingResult1 = count(item =>
+    k1FieldHasValue(item.ship1) && !item.result1
+  );
 
   const pass2 = count(item => item.passRound === 2);
-  const fail2 = count(item => item.result1 === "Fail" && item.result2 === "Fail");
-  const waiting2 = count(item =>
-    item.result1 === "Fail" && !item.result2 && item.passRound === null
+  const fail2 = count(item =>
+    item.result1 === "Fail" && item.result2 === "Fail"
+  );
+  const waitingShipment2 = count(item =>
+    item.result1 === "Fail" &&
+    !k1FieldHasValue(item.ship2) &&
+    !item.result2
+  );
+  const pendingResult2 = count(item =>
+    item.result1 === "Fail" &&
+    k1FieldHasValue(item.ship2) &&
+    !item.result2
   );
 
   const pass3 = count(item => item.passRound === 3);
@@ -1466,24 +1519,33 @@ function drawK1Sankey() {
     item.result2 === "Fail" &&
     item.result3 === "Fail"
   );
-  const waiting3 = count(item =>
+  const waitingShipment3 = count(item =>
     item.result1 === "Fail" &&
     item.result2 === "Fail" &&
-    !item.result3 &&
-    item.passRound === null
+    !k1FieldHasValue(item.ship3) &&
+    !item.result3
+  );
+  const pendingResult3 = count(item =>
+    item.result1 === "Fail" &&
+    item.result2 === "Fail" &&
+    k1FieldHasValue(item.ship3) &&
+    !item.result3
   );
 
   const labels = [
     "K1 required",
     "Pass round 1",
     "Fail round 1",
-    "Waiting round 1",
+    "Waiting shipment R1",
+    "Result pending R1",
     "Pass round 2",
     "Fail round 2",
-    "Waiting round 2",
+    "Waiting re-fit R2",
+    "Result pending R2",
     "Pass round 3",
-    "Fail round 3",
-    "Waiting round 3"
+    "Still fail R3",
+    "Waiting re-fit R3",
+    "Result pending R3"
   ];
 
   const links = [];
@@ -1494,15 +1556,18 @@ function drawK1Sankey() {
 
   add(0, 1, pass1, hexToRgba(COLORS.teal, 0.56));
   add(0, 2, fail1, hexToRgba(COLORS.coral, 0.48));
-  add(0, 3, waiting1, hexToRgba(COLORS.orange, 0.44));
+  add(0, 3, waitingShipment1, hexToRgba(COLORS.orange, 0.44));
+  add(0, 4, pendingResult1, hexToRgba(COLORS.cyan, 0.44));
 
-  add(2, 4, pass2, hexToRgba(COLORS.teal, 0.56));
-  add(2, 5, fail2, hexToRgba(COLORS.coral, 0.48));
-  add(2, 6, waiting2, hexToRgba(COLORS.orange, 0.44));
+  add(2, 5, pass2, hexToRgba(COLORS.teal, 0.56));
+  add(2, 6, fail2, hexToRgba(COLORS.coral, 0.48));
+  add(2, 7, waitingShipment2, hexToRgba(COLORS.orange, 0.44));
+  add(2, 8, pendingResult2, hexToRgba(COLORS.cyan, 0.44));
 
-  add(5, 7, pass3, hexToRgba(COLORS.teal, 0.56));
-  add(5, 8, fail3, hexToRgba(COLORS.coral, 0.48));
-  add(5, 9, waiting3, hexToRgba(COLORS.orange, 0.44));
+  add(6, 9, pass3, hexToRgba(COLORS.teal, 0.56));
+  add(6, 10, fail3, hexToRgba(COLORS.coral, 0.48));
+  add(6, 11, waitingShipment3, hexToRgba(COLORS.orange, 0.44));
+  add(6, 12, pendingResult3, hexToRgba(COLORS.cyan, 0.44));
 
   Plotly.react(
     "k1SankeyChart",
@@ -1516,15 +1581,18 @@ function drawK1Sankey() {
           COLORS.teal,
           COLORS.coral,
           COLORS.orange,
+          COLORS.cyan,
           COLORS.teal,
           COLORS.coral,
           COLORS.orange,
+          COLORS.cyan,
           COLORS.teal,
           COLORS.coral,
-          COLORS.orange
+          COLORS.orange,
+          COLORS.cyan
         ],
-        pad: 22,
-        thickness: 20,
+        pad: 18,
+        thickness: 18,
         line: { color: "#ffffff", width: 1 }
       },
       link: {
@@ -1682,15 +1750,11 @@ function renderK1DetailTable() {
     </thead>
     <tbody>
       ${rows.map(item => {
-        const statusText = item.passRound
-          ? `Pass round ${item.passRound}`
-          : item.attempts === 0
-            ? "Not submitted"
-            : "Still open";
+        const statusText = item.currentStatus;
 
         const statusClass = item.passRound
           ? "k1-pass"
-          : item.result3 === "Fail"
+          : item.currentStatus.includes("fail")
             ? "k1-fail"
             : "k1-open";
 
