@@ -1,4 +1,4 @@
-const APP_VERSION = "v4.2.0";
+const APP_VERSION = "v4.2.1";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
 let workbook = null;
@@ -8,7 +8,6 @@ let headers = [];
 let choiceControls = {};
 let searchTerm = "";
 let k1Records = [];
-let activeDashboardTab = "developmentView";
 
 const COLORS = {
   orange: "#F6A623",
@@ -71,21 +70,20 @@ document.getElementById("tableSearch").addEventListener("input", event => {
   renderTable();
 });
 
-document.querySelectorAll(".dashboard-tab").forEach(button => {
+document.querySelectorAll(".main-tab").forEach(button => {
   button.addEventListener("click", () => {
-    document.querySelectorAll(".dashboard-tab").forEach(tab => tab.classList.remove("active"));
-    document.querySelectorAll(".dashboard-view").forEach(view => view.classList.remove("active-view"));
+    document.querySelectorAll(".main-tab").forEach(tab => tab.classList.remove("active"));
+    document.querySelectorAll(".dashboard-page").forEach(page => page.classList.remove("active-page"));
 
     button.classList.add("active");
-    activeDashboardTab = button.dataset.tab;
-    document.getElementById(activeDashboardTab).classList.add("active-view");
+    document.getElementById(button.dataset.page).classList.add("active-page");
 
-    if (activeDashboardTab === "qualityView") {
+    if (button.dataset.page === "qualityPage") {
       updateK1Dashboard();
       setTimeout(() => {
         ["k1SankeyChart", "k1RetryChart", "k1FactoryChart"].forEach(id => {
-          const element = document.getElementById(id);
-          if (element && element.data) Plotly.Plots.resize(element);
+          const chart = document.getElementById(id);
+          if (chart && chart.data) Plotly.Plots.resize(chart);
         });
       }, 30);
     }
@@ -166,6 +164,7 @@ function generateDashboard() {
 
   buildFilters();
   dashboard.classList.remove("hidden");
+  document.getElementById("mainTabs").classList.remove("hidden");
   applyFilters();
   dashboard.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1062,66 +1061,61 @@ function renderTable() {
   `;
 }
 
-function cleanK1Result(value) {
-  const status = normalize(value);
-  if (!status || status === "-" || status === "no need" || status === "n/a") return "";
-  if (status.includes("pass")) return "Pass";
-  if (status.includes("fail")) return "Fail";
-  if (status.includes("pending")) return "Pending";
+function normalizeK1Result(value) {
+  const result = normalize(value);
+
+  if (!result || result === "-" || result === "n/a" || result === "no need") {
+    return "";
+  }
+
+  if (result.includes("pass")) return "Pass";
+  if (result.includes("fail")) return "Fail";
+  if (result.includes("pending") || result.includes("waiting")) return "Pending";
+
   return text(value);
 }
 
-function hasK1Activity(row) {
-  const fields = [
-    getCol(row, ["K1 (Plan)"]),
-    getCol(row, ["K1 Ship (Actual)"]),
-    getCol(row, ["K1 result"]),
-    getCol(row, ["K1 re-fit Ship"]),
-    getCol(row, ["K1 resut (2nd)", "K1 result (2nd)"]),
-    getCol(row, ["K1 re-fit Ship2"]),
-    getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"])
-  ];
-
-  return fields.some(value => {
-    const status = normalize(value);
-    return status && status !== "-" && status !== "no need" && status !== "n/a";
-  });
+function k1FieldHasValue(value) {
+  const result = normalize(value);
+  return Boolean(result && result !== "-" && result !== "n/a" && result !== "no need");
 }
 
 function buildK1Records() {
-  const recordsByDev = new Map();
+  const byDevCode = new Map();
 
   filteredData.forEach(row => {
-    if (!hasK1Activity(row)) return;
-
     const devCode = text(getCol(row, ["DEV. Code"]));
     if (!devCode) return;
 
-    const result1 = cleanK1Result(getCol(row, ["K1 result"]));
-    const result2 = cleanK1Result(getCol(row, ["K1 resut (2nd)", "K1 result (2nd)"]));
-    const result3 = cleanK1Result(getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"]));
-
+    const plan = getCol(row, ["K1 (Plan)"]);
     const ship1 = getCol(row, ["K1 Ship (Actual)"]);
+    const result1 = normalizeK1Result(getCol(row, ["K1 result"]));
+
     const ship2 = getCol(row, ["K1 re-fit Ship"]);
+    const result2 = normalizeK1Result(
+      getCol(row, ["K1 resut (2nd)", "K1 result (2nd)"])
+    );
+
     const ship3 = getCol(row, ["K1 re-fit Ship2"]);
+    const result3 = normalizeK1Result(
+      getCol(row, ["K1 resut (3rd)", "K1 result (3rd)"])
+    );
+
+    const hasActivity = [
+      plan, ship1, result1, ship2, result2, ship3, result3
+    ].some(k1FieldHasValue);
+
+    if (!hasActivity) return;
 
     let attempts = 0;
-    if (semanticStatus(ship1) !== "blank" && semanticStatus(ship1) !== "exempt") attempts = 1;
-    if (semanticStatus(ship2) !== "blank" && semanticStatus(ship2) !== "exempt") attempts = 2;
-    if (semanticStatus(ship3) !== "blank" && semanticStatus(ship3) !== "exempt") attempts = 3;
-
-    if (result1) attempts = Math.max(attempts, 1);
-    if (result2) attempts = Math.max(attempts, 2);
-    if (result3) attempts = Math.max(attempts, 3);
+    if (k1FieldHasValue(ship1) || result1) attempts = 1;
+    if (k1FieldHasValue(ship2) || result2) attempts = 2;
+    if (k1FieldHasValue(ship3) || result3) attempts = 3;
 
     let passRound = null;
     if (result1 === "Pass") passRound = 1;
     else if (result2 === "Pass") passRound = 2;
     else if (result3 === "Pass") passRound = 3;
-
-    let latestStatus = result3 || result2 || result1 || "Open";
-    if (passRound) latestStatus = "Pass";
-    else if (latestStatus === "Fail" || latestStatus === "Pending" || attempts > 0) latestStatus = "Open";
 
     const record = {
       devCode,
@@ -1129,28 +1123,30 @@ function buildK1Records() {
       stage: text(getCol(row, ["DEV. Stage"])),
       factory: text(getCol(row, ["Factory"])),
       model: text(getCol(row, ["Model"])),
-      genderModel: text(getCol(row, ["Gender / Model", "Gender_Model"])),
+      genderModel: text(getCol(row, ["Gender / Model"])),
       material: text(getCol(row, ["Material Indicator"])),
-      plan: getCol(row, ["K1 (Plan)"]),
+      plan,
       ship1,
       result1,
       ship2,
       result2,
       ship3,
       result3,
-      attempts: Math.max(attempts, passRound || 0),
+      attempts: Math.max(attempts, passRound || 0, 1),
       passRound,
-      firstFail: result1 === "Fail",
-      latestStatus
+      firstFailed: result1 === "Fail",
+      stillOpen: !passRound
     };
 
-    const previous = recordsByDev.get(devCode);
+    const previous = byDevCode.get(devCode);
+
+    // Keep the row containing the furthest K1 attempt.
     if (!previous || record.attempts >= previous.attempts) {
-      recordsByDev.set(devCode, record);
+      byDevCode.set(devCode, record);
     }
   });
 
-  return [...recordsByDev.values()].sort((a, b) =>
+  return [...byDevCode.values()].sort((a, b) =>
     a.devCode.localeCompare(b.devCode, undefined, { numeric: true })
   );
 }
@@ -1159,21 +1155,24 @@ function updateK1Dashboard() {
   k1Records = buildK1Records();
 
   const total = k1Records.length;
-  const pass1 = k1Records.filter(item => item.passRound === 1).length;
-  const needRefit = k1Records.filter(item => item.firstFail).length;
-  const stillOpen = k1Records.filter(item => !item.passRound).length;
-  const attemptsTotal = k1Records.reduce((sum, item) => sum + Math.max(item.attempts, 1), 0);
-  const averageAttempts = total ? attemptsTotal / total : 0;
+  const firstPass = k1Records.filter(item => item.passRound === 1).length;
+  const needRefit = k1Records.filter(item => item.firstFailed).length;
+  const stillOpen = k1Records.filter(item => item.stillOpen).length;
+  const averageAttempts = total
+    ? k1Records.reduce((sum, item) => sum + item.attempts, 0) / total
+    : 0;
 
   document.getElementById("k1FirstPass").textContent =
-    total ? `${Math.round(pass1 / total * 100)}%` : "0%";
+    total ? `${Math.round(firstPass / total * 100)}%` : "0%";
+
   document.getElementById("k1AverageAttempts").textContent =
     averageAttempts.toFixed(1);
+
   document.getElementById("k1NeedRefit").textContent = needRefit;
   document.getElementById("k1StillOpen").textContent = stillOpen;
 
   drawK1Sankey();
-  drawK1RetryDistribution();
+  drawK1RetryChart();
   drawK1FactoryChart();
   renderK1DetailTable();
 }
@@ -1181,29 +1180,34 @@ function updateK1Dashboard() {
 function drawK1Sankey() {
   const count = predicate => k1Records.filter(predicate).length;
 
-  const firstPass = count(item => item.passRound === 1);
-  const firstFail = count(item => item.result1 === "Fail");
-  const firstPending = count(item => item.result1 === "Pending" || !item.result1);
+  const pass1 = count(item => item.passRound === 1);
+  const fail1 = count(item => item.result1 === "Fail");
+  const pending1 = count(item => !item.result1 || item.result1 === "Pending");
 
-  const secondPass = count(item => item.passRound === 2);
-  const secondFail = count(item => item.result1 === "Fail" && item.result2 === "Fail");
-  const waitingSecond = count(item =>
-    item.result1 === "Fail" && !item.result2 && item.passRound === null
+  const pass2 = count(item => item.passRound === 2);
+  const fail2 = count(item => item.result1 === "Fail" && item.result2 === "Fail");
+  const waiting2 = count(item =>
+    item.result1 === "Fail" && !item.result2 && !item.passRound
   );
 
-  const thirdPass = count(item => item.passRound === 3);
-  const thirdFail = count(item =>
-    item.result1 === "Fail" && item.result2 === "Fail" && item.result3 === "Fail"
+  const pass3 = count(item => item.passRound === 3);
+  const fail3 = count(item =>
+    item.result1 === "Fail" &&
+    item.result2 === "Fail" &&
+    item.result3 === "Fail"
   );
-  const waitingThird = count(item =>
-    item.result1 === "Fail" && item.result2 === "Fail" && !item.result3
+  const waiting3 = count(item =>
+    item.result1 === "Fail" &&
+    item.result2 === "Fail" &&
+    !item.result3 &&
+    !item.passRound
   );
 
   const labels = [
     "K1 started",
     "Pass round 1",
     "Fail round 1",
-    "Pending round 1",
+    "Waiting round 1",
     "Pass round 2",
     "Fail round 2",
     "Waiting round 2",
@@ -1218,143 +1222,181 @@ function drawK1Sankey() {
     if (value > 0) links.push({ source, target, value, color });
   }
 
-  add(0, 1, firstPass, hexToRgba(COLORS.teal, .55));
-  add(0, 2, firstFail, hexToRgba(COLORS.coral, .48));
-  add(0, 3, firstPending, hexToRgba(COLORS.orange, .45));
+  add(0, 1, pass1, hexToRgba(COLORS.teal, 0.56));
+  add(0, 2, fail1, hexToRgba(COLORS.coral, 0.48));
+  add(0, 3, pending1, hexToRgba(COLORS.orange, 0.44));
 
-  add(2, 4, secondPass, hexToRgba(COLORS.teal, .55));
-  add(2, 5, secondFail, hexToRgba(COLORS.coral, .48));
-  add(2, 6, waitingSecond, hexToRgba(COLORS.orange, .45));
+  add(2, 4, pass2, hexToRgba(COLORS.teal, 0.56));
+  add(2, 5, fail2, hexToRgba(COLORS.coral, 0.48));
+  add(2, 6, waiting2, hexToRgba(COLORS.orange, 0.44));
 
-  add(5, 7, thirdPass, hexToRgba(COLORS.teal, .55));
-  add(5, 8, thirdFail, hexToRgba(COLORS.coral, .48));
-  add(5, 9, waitingThird, hexToRgba(COLORS.orange, .45));
+  add(5, 7, pass3, hexToRgba(COLORS.teal, 0.56));
+  add(5, 8, fail3, hexToRgba(COLORS.coral, 0.48));
+  add(5, 9, waiting3, hexToRgba(COLORS.orange, 0.44));
 
-  Plotly.react("k1SankeyChart", [{
-    type: "sankey",
-    arrangement: "snap",
-    node: {
-      label: labels,
-      color: [
-        COLORS.navy,
-        COLORS.teal,
-        COLORS.coral,
-        COLORS.orange,
-        COLORS.teal,
-        COLORS.coral,
-        COLORS.orange,
-        COLORS.teal,
-        COLORS.coral,
-        COLORS.orange
-      ],
-      pad: 22,
-      thickness: 20,
-      line: { color: "#ffffff", width: 1 }
+  Plotly.react(
+    "k1SankeyChart",
+    [{
+      type: "sankey",
+      arrangement: "snap",
+      node: {
+        label: labels,
+        color: [
+          COLORS.navy,
+          COLORS.teal,
+          COLORS.coral,
+          COLORS.orange,
+          COLORS.teal,
+          COLORS.coral,
+          COLORS.orange,
+          COLORS.teal,
+          COLORS.coral,
+          COLORS.orange
+        ],
+        pad: 22,
+        thickness: 20,
+        line: { color: "#ffffff", width: 1 }
+      },
+      link: {
+        source: links.map(item => item.source),
+        target: links.map(item => item.target),
+        value: links.map(item => item.value),
+        color: links.map(item => item.color),
+        hovertemplate:
+          "%{source.label} → %{target.label}<br>" +
+          "<b>%{value}</b> DEV codes<extra></extra>"
+      }
+    }],
+    baseLayout({
+      margin: { l: 10, r: 10, t: 18, b: 18 }
+    }),
+    plotConfig
+  );
+}
+
+function drawK1RetryChart() {
+  const data = [
+    {
+      label: "Pass round 1",
+      value: k1Records.filter(item => item.passRound === 1).length,
+      color: COLORS.teal
     },
-    link: {
-      source: links.map(item => item.source),
-      target: links.map(item => item.target),
-      value: links.map(item => item.value),
-      color: links.map(item => item.color),
-      hovertemplate:
-        "%{source.label} → %{target.label}<br><b>%{value}</b> DEV codes<extra></extra>"
+    {
+      label: "Pass round 2",
+      value: k1Records.filter(item => item.passRound === 2).length,
+      color: COLORS.cyan
+    },
+    {
+      label: "Pass round 3",
+      value: k1Records.filter(item => item.passRound === 3).length,
+      color: COLORS.navy
+    },
+    {
+      label: "Still open",
+      value: k1Records.filter(item => item.stillOpen).length,
+      color: COLORS.coral
     }
-  }], baseLayout({
-    margin: { l: 10, r: 10, t: 18, b: 18 }
-  }), plotConfig);
-}
+  ].reverse();
 
-function drawK1RetryDistribution() {
-  const categories = [
-    { label: "Pass round 1", value: k1Records.filter(item => item.passRound === 1).length, color: COLORS.teal },
-    { label: "Pass round 2", value: k1Records.filter(item => item.passRound === 2).length, color: COLORS.cyan },
-    { label: "Pass round 3", value: k1Records.filter(item => item.passRound === 3).length, color: COLORS.navy },
-    { label: "Still open", value: k1Records.filter(item => !item.passRound).length, color: COLORS.coral }
-  ];
-
-  Plotly.react("k1RetryChart", [{
-    type: "bar",
-    orientation: "h",
-    y: categories.map(item => item.label).reverse(),
-    x: categories.map(item => item.value).reverse(),
-    text: categories.map(item => String(item.value)).reverse(),
-    textposition: "outside",
-    marker: { color: categories.map(item => item.color).reverse() },
-    hovertemplate: "%{y}<br><b>%{x}</b> DEV codes<extra></extra>"
-  }], baseLayout({
-    margin: { l: 105, r: 35, t: 20, b: 35 },
-    xaxis: { showgrid: false, zeroline: false, rangemode: "tozero" },
-    yaxis: { showgrid: false }
-  }), plotConfig);
-}
-
-function k1FactoryMetrics() {
-  return uniqueValues(k1Records, ["factory"]).map(() => null);
+  Plotly.react(
+    "k1RetryChart",
+    [{
+      type: "bar",
+      orientation: "h",
+      y: data.map(item => item.label),
+      x: data.map(item => item.value),
+      text: data.map(item => String(item.value)),
+      textposition: "outside",
+      marker: { color: data.map(item => item.color) },
+      hovertemplate: "%{y}<br><b>%{x}</b> DEV codes<extra></extra>"
+    }],
+    baseLayout({
+      margin: { l: 105, r: 35, t: 20, b: 35 },
+      xaxis: { showgrid: false, zeroline: false, rangemode: "tozero" },
+      yaxis: { showgrid: false }
+    }),
+    plotConfig
+  );
 }
 
 function drawK1FactoryChart() {
-  const map = new Map();
+  const factoryMap = new Map();
 
   k1Records.forEach(item => {
     if (!item.factory) return;
-    if (!map.has(item.factory)) map.set(item.factory, []);
-    map.get(item.factory).push(item);
+    if (!factoryMap.has(item.factory)) factoryMap.set(item.factory, []);
+    factoryMap.get(item.factory).push(item);
   });
 
-  const data = [...map.entries()].map(([factory, records]) => ({
-    factory,
-    firstPassRate: records.length
-      ? Math.round(records.filter(item => item.passRound === 1).length / records.length * 100)
-      : 0,
-    averageAttempts: records.reduce((sum, item) => sum + Math.max(item.attempts, 1), 0) / records.length,
-    count: records.length
-  })).sort((a, b) => b.firstPassRate - a.firstPassRate);
+  const data = [...factoryMap.entries()]
+    .map(([factory, records]) => ({
+      factory,
+      firstPassRate: Math.round(
+        records.filter(item => item.passRound === 1).length /
+        records.length *
+        100
+      ),
+      averageAttempts:
+        records.reduce((sum, item) => sum + item.attempts, 0) /
+        records.length
+    }))
+    .sort((a, b) => b.firstPassRate - a.firstPassRate);
 
-  Plotly.react("k1FactoryChart", [
-    {
-      type: "bar",
-      x: data.map(item => item.factory),
-      y: data.map(item => item.firstPassRate),
-      name: "First-pass rate",
-      marker: { color: COLORS.teal },
-      text: data.map(item => `${item.firstPassRate}%`),
-      textposition: "outside",
-      hovertemplate:
-        "%{x}<br>First-pass rate: <b>%{y}%</b><extra></extra>"
-    },
-    {
-      type: "scatter",
-      mode: "lines+markers",
-      x: data.map(item => item.factory),
-      y: data.map(item => Number(item.averageAttempts.toFixed(2))),
-      name: "Average attempts",
-      yaxis: "y2",
-      marker: { color: COLORS.coral, size: 8 },
-      line: { color: COLORS.coral, width: 2 },
-      hovertemplate:
-        "%{x}<br>Average attempts: <b>%{y}</b><extra></extra>"
-    }
-  ], baseLayout({
-    margin: { l: 45, r: 48, t: 25, b: 55 },
-    barmode: "group",
-    xaxis: { showgrid: false },
-    yaxis: {
-      title: "First-pass rate",
-      range: [0, 110],
-      ticksuffix: "%",
-      showgrid: false,
-      zeroline: false
-    },
-    yaxis2: {
-      title: "Attempts",
-      overlaying: "y",
-      side: "right",
-      range: [0, Math.max(3.2, ...data.map(item => item.averageAttempts + .5))],
-      showgrid: false,
-      zeroline: false
-    },
-    legend: { orientation: "h", x: 0, y: 1.15 }
-  }), plotConfig);
+  Plotly.react(
+    "k1FactoryChart",
+    [
+      {
+        type: "bar",
+        x: data.map(item => item.factory),
+        y: data.map(item => item.firstPassRate),
+        name: "First-pass rate",
+        marker: { color: COLORS.teal },
+        text: data.map(item => `${item.firstPassRate}%`),
+        textposition: "outside",
+        hovertemplate:
+          "%{x}<br>First-pass rate: <b>%{y}%</b><extra></extra>"
+      },
+      {
+        type: "scatter",
+        mode: "lines+markers",
+        x: data.map(item => item.factory),
+        y: data.map(item => Number(item.averageAttempts.toFixed(2))),
+        name: "Average attempts",
+        yaxis: "y2",
+        marker: { color: COLORS.coral, size: 8 },
+        line: { color: COLORS.coral, width: 2 },
+        hovertemplate:
+          "%{x}<br>Average attempts: <b>%{y}</b><extra></extra>"
+      }
+    ],
+    baseLayout({
+      margin: { l: 45, r: 50, t: 28, b: 60 },
+      xaxis: { showgrid: false, tickangle: -25 },
+      yaxis: {
+        title: "First-pass rate",
+        range: [0, 110],
+        ticksuffix: "%",
+        showgrid: false,
+        zeroline: false
+      },
+      yaxis2: {
+        title: "Attempts",
+        overlaying: "y",
+        side: "right",
+        range: [
+          0,
+          Math.max(
+            3.2,
+            ...data.map(item => item.averageAttempts + 0.5)
+          )
+        ],
+        showgrid: false,
+        zeroline: false
+      },
+      legend: { orientation: "h", x: 0, y: 1.16 }
+    }),
+    plotConfig
+  );
 }
 
 function renderK1DetailTable() {
@@ -1364,7 +1406,7 @@ function renderK1DetailTable() {
     if (filter === "pass1") return item.passRound === 1;
     if (filter === "pass2") return item.passRound === 2;
     if (filter === "pass3") return item.passRound === 3;
-    if (filter === "open") return !item.passRound;
+    if (filter === "open") return item.stillOpen;
     return true;
   });
 
@@ -1383,24 +1425,26 @@ function renderK1DetailTable() {
     </thead>
     <tbody>
       ${rows.map(item => {
+        const statusText = item.passRound
+          ? `Pass round ${item.passRound}`
+          : "Still open";
+
         const statusClass = item.passRound
-          ? "k1-status-pass"
-          : item.latestStatus === "Open"
-            ? "k1-status-open"
-            : "k1-status-fail";
+          ? "k1-pass"
+          : item.result3 === "Fail"
+            ? "k1-fail"
+            : "k1-open";
 
         return `
           <tr>
             <td>${escapeHtml(item.devCode)}</td>
             <td>${escapeHtml(item.factory)}</td>
             <td>${escapeHtml(item.model || item.genderModel)}</td>
-            <td>${item.attempts || 1}</td>
+            <td>${item.attempts}</td>
             <td>${escapeHtml(item.result1 || "-")}</td>
             <td>${escapeHtml(item.result2 || "-")}</td>
             <td>${escapeHtml(item.result3 || "-")}</td>
-            <td class="${statusClass}">
-              ${item.passRound ? `Pass round ${item.passRound}` : "Still open"}
-            </td>
+            <td class="${statusClass}">${statusText}</td>
           </tr>
         `;
       }).join("")}

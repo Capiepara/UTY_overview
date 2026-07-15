@@ -1014,38 +1014,42 @@ tbody tr:hover {
 }
 
 
-/* v4.2.0 — dashboard tabs and K1 quality module */
-.dashboard-tabs {
+/* v4.2.1 — clearly visible page tabs and K1 Quality dashboard */
+.main-tabs {
   display: flex;
-  gap: 4px;
-  margin: 13px 0;
-  padding: 4px;
-  background: #e7e4e0;
-  border: 1px solid var(--line);
+  gap: 0;
+  margin: 14px 0 0;
+  border: 1px solid #cfd8df;
+  background: #e9edf1;
 }
 
-.dashboard-tab {
+.main-tabs.hidden {
+  display: none;
+}
+
+.main-tab {
   width: auto;
-  min-height: 38px;
-  padding: 0 22px;
+  min-width: 180px;
+  min-height: 44px;
+  padding: 0 24px;
   border: 0;
+  border-right: 1px solid #cfd8df;
   background: transparent;
-  color: #596773;
+  color: #526472;
   cursor: pointer;
   font-weight: 800;
 }
 
-.dashboard-tab.active {
-  background: #ffffff;
-  color: #023E8A;
-  box-shadow: 0 2px 8px rgba(38, 55, 70, 0.08);
+.main-tab.active {
+  background: #023E8A;
+  color: #ffffff;
 }
 
-.dashboard-view {
+.dashboard-page {
   display: none;
 }
 
-.dashboard-view.active-view {
+.dashboard-page.active-page {
   display: block;
 }
 
@@ -1053,7 +1057,11 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 13px;
-  margin-bottom: 13px;
+  margin: 14px 0 13px;
+}
+
+.accent-teal::before {
+  background: var(--teal);
 }
 
 .k1-top-row {
@@ -1061,39 +1069,39 @@ tbody tr:hover {
 }
 
 .k1-bottom-row {
-  grid-template-columns: 0.8fr 1.2fr;
+  grid-template-columns: 0.82fr 1.18fr;
 }
 
 .k1-detail-panel {
-  padding: 17px;
   min-width: 0;
+  padding: 17px;
 }
 
 .k1-detail-filter {
   width: 190px;
-  min-height: 37px;
+  min-height: 38px;
 }
 
 .k1-detail-wrap {
   max-height: 470px;
 }
 
-.k1-status-pass {
+.k1-pass {
   color: #287967;
   font-weight: 800;
 }
 
-.k1-status-fail {
-  color: #b72f35;
-  font-weight: 800;
-}
-
-.k1-status-open {
+.k1-open {
   color: #b07400;
   font-weight: 800;
 }
 
-@media (max-width: 1100px) {
+.k1-fail {
+  color: #b72f35;
+  font-weight: 800;
+}
+
+@media (max-width: 1080px) {
   .k1-kpi-grid,
   .k1-top-row,
   .k1-bottom-row {
@@ -1102,13 +1110,14 @@ tbody tr:hover {
 }
 
 @media (max-width: 720px) {
-  .dashboard-tabs {
+  .main-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
 
-  .dashboard-tab {
+  .main-tab {
     width: 100%;
+    min-width: 0;
     padding: 0 8px;
   }
 
