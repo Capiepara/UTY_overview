@@ -1,3 +1,9 @@
+
+function formatUTCDate(date){
+  if(!date) return "—";
+  return date.toLocaleDateString("en-GB",{timeZone:"UTC"});
+}
+
 const APP_VERSION = "v4.2.2";
 document.getElementById("appVersion").textContent = APP_VERSION;
 
@@ -909,12 +915,12 @@ function drawCFMHealth() {
 
         <div class="cfm-summary-card" style="border-left-color:${COLORS.cyan}">
           <span>Median planned ETD</span>
-          <strong>${medianPlan ? medianPlan.toLocaleDateString("en-GB") : "—"}</strong>
+          <strong>${medianPlan ? medianPlan.toLocaleDateString("en-GB",{timeZone:"UTC"}) : "—"}</strong>
         </div>
 
         <div class="cfm-summary-card" style="border-left-color:${COLORS.teal}">
           <span>Median actual sent</span>
-          <strong>${medianActual ? medianActual.toLocaleDateString("en-GB") : "—"}</strong>
+          <strong>${medianActual ? medianActual.toLocaleDateString("en-GB",{timeZone:"UTC"}) : "—"}</strong>
         </div>
 
         <div class="cfm-summary-card" style="border-left-color:${COLORS.coral}">
@@ -1658,7 +1664,7 @@ function formatCell(value) {
     date &&
     (value instanceof Date || typeof value === "number")
   ) {
-    return date.toLocaleDateString("en-GB");
+    return date.toLocaleDateString("en-GB",{timeZone:"UTC"});
   }
 
   return escapeHtml(text(value));
