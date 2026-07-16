@@ -4,8 +4,12 @@ function formatUTCDate(date){
   return date.toLocaleDateString("en-GB",{timeZone:"UTC"});
 }
 
-const APP_VERSION = "v4.2.2";
+const APP_VERSION = "v4.3.3";
+const BUILD_DATE = "2026-07-16";
+const BUILD_NOTE = "dash/no-need fix";
 document.getElementById("appVersion").textContent = APP_VERSION;
+const bs=document.getElementById("buildStamp");
+if(bs){bs.textContent=`Build ${BUILD_DATE} • ${BUILD_NOTE}`;}
 
 let workbook = null;
 let rawData = [];
